@@ -77,7 +77,7 @@ describe.only('Validator', () => {
       const ast: ASTNode = {
         type: 'comparison',
         field: 'metadata.accountPeriodBeginDate',
-        operator: 'eq',
+        operator: 'contains',
         value: '2025-07-01',
       };
 
@@ -86,8 +86,8 @@ describe.only('Validator', () => {
         .then((err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('INVALID_OPERATOR');
-          expect(err.token).to.equal('eq');
-          expect(err.message).to.equal("Operator 'eq' is not supported");
+          expect(err.token).to.equal('contains');
+          expect(err.message).to.equal("Operator 'contains' is not supported");
         });
     });
 
@@ -162,6 +162,81 @@ describe.only('Validator', () => {
       };
 
       expect(() => validator.validate(ast)).to.not.throw();
+    });
+
+    it('should validate logical or expressions', () => {
+      const stringFieldConfig: ODataLiteConfig = {
+        fields: {
+          'metadata.status': { type: 'string' },
+        },
+        operators: odataConfig.operators,
+      };
+
+      const ast: ASTNode = {
+        type: 'logical',
+        operator: 'or',
+        left: {
+          type: 'comparison',
+          field: 'metadata.status',
+          operator: 'eq',
+          value: 'active',
+        },
+        right: {
+          type: 'comparison',
+          field: 'metadata.status',
+          operator: 'eq',
+          value: 'pending',
+        },
+      };
+
+      expect(() => new Validator(stringFieldConfig).validate(ast)).to.not.throw();
+    });
+  });
+
+  describe('eq / ne validation', () => {
+    const stringFieldConfig: ODataLiteConfig = {
+      fields: {
+        'metadata.status': { type: 'string' },
+      },
+      operators: odataConfig.operators,
+    };
+
+    it('should validate a valid eq comparison', () => {
+      const ast: ASTNode = {
+        type: 'comparison',
+        field: 'metadata.status',
+        operator: 'eq',
+        value: 'active',
+      };
+
+      expect(() => new Validator(stringFieldConfig).validate(ast)).to.not.throw();
+    });
+
+    it('should validate a valid ne comparison', () => {
+      const ast: ASTNode = {
+        type: 'comparison',
+        field: 'metadata.status',
+        operator: 'ne',
+        value: 'active',
+      };
+
+      expect(() => new Validator(stringFieldConfig).validate(ast)).to.not.throw();
+    });
+
+    it('should reject eq for date fields', async () => {
+      const ast: ASTNode = {
+        type: 'comparison',
+        field: 'metadata.accountPeriodBeginDate',
+        operator: 'eq',
+        value: '2025-07-01',
+      };
+
+      await expect((async () => validator.validate(ast))())
+        .to.be.rejected
+        .then((err: ODataLiteError) => {
+          expect(err).to.be.instanceOf(ODataLiteError);
+          expect(err.code).to.equal('OPERATOR_NOT_ALLOWED_FOR_FIELD_TYPE');
+        });
     });
   });
 });

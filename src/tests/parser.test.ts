@@ -27,6 +27,56 @@ describe('Parser', () => {
     expect(ast.type).to.equal('logical');
   });
 
+  it('should parse an eq comparison expression', () => {
+    const tokens = new Lexer("metadata.status eq 'active'").tokenize();
+
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+
+    expect(ast).to.deep.equal({
+      type: 'comparison',
+      field: 'metadata.status',
+      operator: 'eq',
+      value: 'active',
+    });
+  });
+
+  it('should parse logical or expressions', () => {
+    const tokens = new Lexer(
+      "metadata.status eq 'active' or metadata.status eq 'pending'"
+    ).tokenize();
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+    expect(ast.type).to.equal('logical');
+    expect((ast as { operator: string }).operator).to.equal('or');
+  });
+
+  it('should parse and with higher precedence than or', () => {
+    const tokens = new Lexer(
+      "metadata.status eq 'active' and metadata.accountPeriodBeginDate ge 2025-07-01 or metadata.status eq 'pending'"
+    ).tokenize();
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+
+    expect(ast.type).to.equal('logical');
+    expect((ast as { operator: string }).operator).to.equal('or');
+    expect((ast as { left: { type: string; operator: string } }).left.type).to.equal('logical');
+    expect((ast as { left: { type: string; operator: string } }).left.operator).to.equal('and');
+  });
+
+  it('should throw ODataLiteError for an empty quoted value', () => {
+    const tokens = new Lexer("metadata.status eq ''").tokenize();
+    const parser = new Parser(tokens);
+    try {
+      parser.parse();
+      expect.fail('Expected ODataLiteError');
+    } catch (err: unknown) {
+      expect(err).to.be.instanceOf(ODataLiteError);
+      const error = err as ODataLiteError;
+      expect(error.code).to.equal('UNEXPECTED_TOKEN');
+    }
+  });
+
   it('should throw ODataLiteError for malformed expression', () => {
     const tokens = new Lexer('metadata.accountPeriodBeginDate ge').tokenize();
     const parser = new Parser(tokens);

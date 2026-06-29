@@ -6,8 +6,10 @@ export class MongoBuilder {
 
   build(node: ASTNode): MongoQuery {
     if (node.type == 'logical') {
+      const mongoOperator = node.operator === 'and' ? '$and' : '$or';
+
       return {
-        $and: [this.build(node.left), this.build(node.right)],
+        [mongoOperator]: [this.build(node.left), this.build(node.right)],
       };
     }
 

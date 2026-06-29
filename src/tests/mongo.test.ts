@@ -25,6 +25,59 @@ describe('MongoBuilder', () => {
     });
   });
 
+  it('should build mongo query for an eq comparison', () => {
+    const ast: ASTNode = {
+      type: 'comparison',
+      field: 'metadata.status',
+      operator: 'eq',
+      value: 'active',
+    };
+
+    const result = builder.build(ast);
+
+    expect(result).to.deep.equal({
+      'metadata.status': { $eq: 'active' },
+    });
+  });
+
+  it('should build mongo query for a ne comparison', () => {
+    const ast: ASTNode = {
+      type: 'comparison',
+      field: 'metadata.status',
+      operator: 'ne',
+      value: 'active',
+    };
+
+    const result = builder.build(ast);
+
+    expect(result).to.deep.equal({
+      'metadata.status': { $ne: 'active' },
+    });
+  });
+
+  it('should build mongo query for a logical or expression', () => {
+    const ast: ASTNode = {
+      type: 'logical',
+      operator: 'or',
+      left: {
+        type: 'comparison',
+        field: 'metadata.status',
+        operator: 'eq',
+        value: 'active',
+      },
+      right: {
+        type: 'comparison',
+        field: 'metadata.status',
+        operator: 'eq',
+        value: 'pending',
+      },
+    };
+
+    const result = builder.build(ast);
+
+    expect(result).to.have.property('$or');
+  });
+
   it('should build mongo quer for logical expression', () => {
     const ast: ASTNode = {
       type: 'logical',

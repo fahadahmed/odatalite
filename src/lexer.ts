@@ -4,6 +4,7 @@ export type Token =
   | { type: 'operator'; value: string }
   | { type: 'value'; value: string }
   | { type: 'and' }
+  | { type: 'or' }
   | { type: 'eof' };
 
 export class Lexer {
@@ -29,6 +30,11 @@ export class Lexer {
 
       if (/[0-9]/.test(c)) {
         tokens.push(this.readValue());
+        continue;
+      }
+
+      if (c === "'") {
+        tokens.push(this.readQuotedValue());
         continue;
       }
 
@@ -59,9 +65,27 @@ export class Lexer {
       return { type: 'and' };
     }
 
-    if (value == 'ge' || value == 'le' || value === 'gt' || value === 'lt') {
+    if (value === 'or') {
+      return { type: 'or' };
+    }
+
+    if (
+      value == 'ge' ||
+      value == 'le' ||
+      value === 'gt' ||
+      value === 'lt' ||
+      value === 'eq' ||
+      value === 'ne'
+    ) {
       return {
         type: 'operator',
+        value,
+      };
+    }
+
+    if (value === 'true' || value === 'false') {
+      return {
+        type: 'value',
         value,
       };
     }
@@ -82,6 +106,31 @@ export class Lexer {
       value += this.input[this.i];
       this.i++;
     }
+
+    return {
+      type: 'value',
+      value,
+    };
+  }
+
+  private readQuotedValue(): Token {
+    this.i++;
+    let value = '';
+
+    while (this.i < this.input.length && this.input[this.i] !== "'") {
+      value += this.input[this.i];
+      this.i++;
+    }
+
+    if (this.input[this.i] !== "'") {
+      throw new ODataLiteError({
+        code: 'INVALID_CHARACTER',
+        message: `Unterminated string literal in filter`,
+        position: this.i,
+      });
+    }
+
+    this.i++;
 
     return {
       type: 'value',

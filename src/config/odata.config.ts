@@ -13,6 +13,20 @@ export const odataConfig = {
   },
 
   operators: {
+    eq: {
+      allowedTypes: ['string', 'number', 'boolean'],
+      toMongo: (field: string, value: string) => ({
+        [field]: { $eq: value },
+      }),
+    },
+
+    ne: {
+      allowedTypes: ['string', 'number', 'boolean'],
+      toMongo: (field: string, value: string) => ({
+        [field]: { $ne: value },
+      }),
+    },
+
     gt: {
       allowedTypes: ['date', 'number'],
       toMongo: (field: string, value: string) => ({

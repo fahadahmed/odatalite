@@ -95,10 +95,35 @@ metadata.accountPeriodBeginDate ge 2023-07-01
 metadata.accountPeriodBeginDate ge 2023-07-01 and metadata.accountPeriodEndDate le 2026-06-30
 ```
 
+## Multiple comparisons using `or`
+
+```txt
+metadata.status eq 'active' or metadata.status eq 'pending'
+```
+
+`and` binds tighter than `or` (no parentheses support yet), so:
+
+```txt
+A and B or C
+```
+
+parses as `(A and B) or C`.
+
+## String and boolean literal values
+
+String values must be single-quoted; bare words are otherwise tokenized as identifiers, not values.
+
+```txt
+metadata.status eq 'active'
+metadata.isActive eq true
+```
+
 ## Supported operators
 
 | Operator | Meaning | Allowed field types |
 |---|---|---|
+| `eq` | equal | `string`, `number`, `boolean` |
+| `ne` | not equal | `string`, `number`, `boolean` |
 | `gt` | greater than | `date`, `number` |
 | `lt` | less than | `date`, `number` |
 | `ge` | greater than or equal | `date`, `number` |
@@ -254,6 +279,14 @@ Logical expressions become:
 }
 ```
 
+or, for `or` expressions:
+
+```ts
+{
+  $or: [...]
+}
+```
+
 ---
 
 # Configuration
@@ -275,6 +308,20 @@ export const odataConfig = {
   },
 
   operators: {
+    eq: {
+      allowedTypes: ['string', 'number', 'boolean'],
+      toMongo: (field, value) => ({
+        [field]: { $eq: value },
+      }),
+    },
+
+    ne: {
+      allowedTypes: ['string', 'number', 'boolean'],
+      toMongo: (field, value) => ({
+        [field]: { $ne: value },
+      }),
+    },
+
     gt: {
       allowedTypes: ['date', 'number'],
       toMongo: (field, value) => ({
@@ -456,22 +503,20 @@ The architecture intentionally supports future evolution.
 
 Potential future capabilities include:
 
-## OR support
-
-```txt
-A or B
-```
-
 ## Parentheses support
 
 ```txt
 (A and B) or C
 ```
 
+## `any` lambda support over collections
+
+```txt
+Tags/any(t: t/name eq 'urgent')
+```
+
 ## Additional operators
 
-- `eq`
-- `ne`
 - `in`
 
 ## Alternative query backends

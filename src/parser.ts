@@ -9,13 +9,29 @@ export class Parser {
 
   parse(): ASTNode {
     try {
-      return this.parseAnd();
+      return this.parseOr();
     } catch {
       throw new ODataLiteError({
         code: 'UNEXPECTED_TOKEN',
         message: `Unexpected token. Not an AND operation.`,
       });
     }
+  }
+
+  private parseOr(): ASTNode {
+    let left = this.parseAnd();
+
+    while (this.match('or')) {
+      const right = this.parseAnd();
+
+      left = {
+        type: 'logical',
+        operator: 'or',
+        left,
+        right,
+      };
+    }
+    return left;
   }
 
   private parseAnd(): ASTNode {
@@ -67,11 +83,11 @@ export class Parser {
   private consume<T extends Token['type']>(type: T): Extract<Token, { type: T }> {
     const token = this.tokens[this.current];
 
-    if (!token || token.type !== type) {
+    if (token.type !== type) {
       throw new ODataLiteError({
         code: 'UNEXPECTED_TOKEN',
-        message: `Expected token '${type}' but received '${token.type ?? 'EOF'}'`,
-        token: token?.type,
+        message: `Expected token '${type}' but received '${token.type}'`,
+        token: token.type,
       });
     }
 

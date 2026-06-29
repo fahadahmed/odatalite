@@ -2,7 +2,7 @@ export type ASTNode = LogicalNode | ComparisonNode;
 
 export interface LogicalNode {
   type: 'logical';
-  operator: 'and';
+  operator: 'and' | 'or';
   left: ASTNode;
   right: ASTNode;
 }
