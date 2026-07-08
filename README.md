@@ -270,14 +270,16 @@ For an `any` node, the referenced field must exist in `config.fields` and be dec
 
 The Mongo builder converts the validated AST into MongoDB query conditions using the `toMongo` function defined per operator in the config.
 
-Date operators use `moment` to produce precise day boundaries:
+For `date` fields, `ge`/`le` widen the value to a day boundary (so they behave as an inclusive range over the whole day), while `eq`/`ne`/`gt`/`lt` compare against the exact UTC instant of the value:
 
-| Operator | MongoDB operator | Boundary |
+| Operator | MongoDB operator | Date conversion |
 |---|---|---|
-| `ge` | `$gte` | `startOf('day')` — inclusive lower bound |
-| `le` | `$lte` | `endOf('day')` — inclusive upper bound |
-| `gt` | `$gt` | `endOf('day')` — exclusive upper bound |
-| `lt` | `$lt` | `startOf('day')` — exclusive lower bound |
+| `ge` | `$gte` | `moment(value).startOf('day').toDate()` — inclusive lower bound |
+| `le` | `$lte` | `moment(value).endOf('day').toDate()` — inclusive upper bound |
+| `eq` | `$eq` | `moment.utc(value).toDate()` — exact instant |
+| `ne` | `$ne` | `moment.utc(value).toDate()` — exact instant |
+| `gt` | `$gt` | `moment.utc(value).toDate()` — exact instant |
+| `lt` | `$lt` | `moment.utc(value).toDate()` — exact instant |
 
 Example output for a single comparison:
 
@@ -353,14 +355,14 @@ export const odataConfig = {
     gt: {
       allowedTypes: ['date', 'string', 'number', 'boolean'],
       toMongo: (field, value, type) => ({
-        [field]: { $gt: toComparable(value, type, 'start') },
+        [field]: { $gt: toComparable(value, type) },
       }),
     },
 
     lt: {
       allowedTypes: ['date', 'string', 'number', 'boolean'],
       toMongo: (field, value, type) => ({
-        [field]: { $lt: toComparable(value, type, 'end') },
+        [field]: { $lt: toComparable(value, type) },
       }),
     },
 
@@ -381,7 +383,7 @@ export const odataConfig = {
 };
 ```
 
-`toComparable` converts the raw string value based on the field's type: dates use day boundaries via `moment`, numbers become `Number(value)`, booleans become `value === 'true'`, and strings pass through unchanged.
+`toComparable` converts the raw string value based on the field's type: dates default to the exact UTC instant (`moment.utc(value).toDate()`), used by `eq`/`ne`/`gt`/`lt`, while `ge`/`le` pass `'start'`/`'end'` to widen to a day boundary (`startOf('day')` / `endOf('day')`); numbers become `Number(value)`, booleans become `value === 'true'`, and strings pass through unchanged.
 
 ---
 
@@ -524,7 +526,7 @@ Add an entry to `config.operators` with `allowedTypes` declaring which field typ
 gt: {
   allowedTypes: ['date', 'number'],
   toMongo: (field, value) => ({
-    [field]: { $gt: moment(value).endOf('day').toDate() },
+    [field]: { $gt: moment.utc(value).toDate() },
   }),
 }
 ```

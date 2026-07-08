@@ -114,7 +114,7 @@ describe('MongoBuilder', () => {
     };
     const typedBuilder = new MongoBuilder(config);
 
-    it('should build eq/ne for a date field using day boundaries', () => {
+    it('should build eq/ne for a date field using the exact UTC instant', () => {
       const eq = typedBuilder.build({
         type: 'comparison',
         field: 'metadata.accountPeriodBeginDate',
@@ -124,7 +124,35 @@ describe('MongoBuilder', () => {
 
       expect(eq).to.deep.equal({
         'metadata.accountPeriodBeginDate': {
-          $eq: moment('2025-07-01').startOf('day').toDate(),
+          $eq: moment.utc('2025-07-01').toDate(),
+        },
+      });
+    });
+
+    it('should build gt/lt for a date field using the exact UTC instant', () => {
+      const gt = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.accountPeriodBeginDate',
+        operator: 'gt',
+        value: '2025-07-01',
+      });
+
+      expect(gt).to.deep.equal({
+        'metadata.accountPeriodBeginDate': {
+          $gt: moment.utc('2025-07-01').toDate(),
+        },
+      });
+
+      const lt = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.accountPeriodBeginDate',
+        operator: 'lt',
+        value: '2025-07-01',
+      });
+
+      expect(lt).to.deep.equal({
+        'metadata.accountPeriodBeginDate': {
+          $lt: moment.utc('2025-07-01').toDate(),
         },
       });
     });

@@ -6,13 +6,13 @@ const ALL_TYPES: FieldDefinition['type'][] = ['date', 'string', 'number', 'boole
 function toComparable(
   value: string,
   type: FieldDefinition['type'],
-  boundary: 'start' | 'end' = 'start',
+  boundary: 'exact' | 'start' | 'end' = 'exact',
 ): unknown {
   switch (type) {
     case 'date':
-      return boundary === 'end'
-        ? moment(value).endOf('day').toDate()
-        : moment(value).startOf('day').toDate();
+      if (boundary === 'start') return moment(value).startOf('day').toDate();
+      if (boundary === 'end') return moment(value).endOf('day').toDate();
+      return moment.utc(value).toDate();
     case 'number':
       return Number(value);
     case 'boolean':
@@ -51,14 +51,14 @@ export const odataConfig = {
     gt: {
       allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $gt: toComparable(value, type, 'start') },
+        [field]: { $gt: toComparable(value, type) },
       }),
     },
 
     lt: {
       allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $lt: toComparable(value, type, 'end') },
+        [field]: { $lt: toComparable(value, type) },
       }),
     },
 
