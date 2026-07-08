@@ -14,6 +14,8 @@ export class MongoBuilder {
     }
 
     const operator = this.config.operators[node.operator];
-    return operator.toMongo(node.field, node.value);
+    const type = this.config.fields[node.field]?.type ?? 'string';
+
+    return operator.toMongo(node.field, node.value, type);
   }
 }

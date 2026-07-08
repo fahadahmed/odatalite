@@ -4,6 +4,7 @@ import { MongoBuilder } from '../mongo';
 import { odataConfig } from '../config/odata.config';
 import { ODataLiteError } from '../error';
 import { ASTNode } from '../ast';
+import { ODataLiteConfig } from '../types';
 
 describe('MongoBuilder', () => {
   const builder = new MongoBuilder(odataConfig);
@@ -99,5 +100,84 @@ describe('MongoBuilder', () => {
     const result = builder.build(ast);
 
     expect(result).to.have.property('$and');
+  });
+
+  describe('type conversion across field types', () => {
+    const config: ODataLiteConfig = {
+      fields: {
+        'metadata.status': { type: 'string' },
+        'metadata.amount': { type: 'number' },
+        'metadata.isActive': { type: 'boolean' },
+        'metadata.accountPeriodBeginDate': { type: 'date' },
+      },
+      operators: odataConfig.operators,
+    };
+    const typedBuilder = new MongoBuilder(config);
+
+    it('should build eq/ne for a date field using day boundaries', () => {
+      const eq = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.accountPeriodBeginDate',
+        operator: 'eq',
+        value: '2025-07-01',
+      });
+
+      expect(eq).to.deep.equal({
+        'metadata.accountPeriodBeginDate': {
+          $eq: moment('2025-07-01').startOf('day').toDate(),
+        },
+      });
+    });
+
+    it('should build gt/lt for a number field as numeric comparisons', () => {
+      const gt = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.amount',
+        operator: 'gt',
+        value: '100',
+      });
+
+      expect(gt).to.deep.equal({ 'metadata.amount': { $gt: 100 } });
+
+      const lt = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.amount',
+        operator: 'lt',
+        value: '100',
+      });
+
+      expect(lt).to.deep.equal({ 'metadata.amount': { $lt: 100 } });
+    });
+
+    it('should build eq/ne for a boolean field as boolean comparisons', () => {
+      const eq = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.isActive',
+        operator: 'eq',
+        value: 'true',
+      });
+
+      expect(eq).to.deep.equal({ 'metadata.isActive': { $eq: true } });
+
+      const ne = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.isActive',
+        operator: 'ne',
+        value: 'false',
+      });
+
+      expect(ne).to.deep.equal({ 'metadata.isActive': { $ne: false } });
+    });
+
+    it('should build ge/le for a string field as lexicographic comparisons', () => {
+      const ge = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.status',
+        operator: 'ge',
+        value: 'active',
+      });
+
+      expect(ge).to.deep.equal({ 'metadata.status': { $gte: 'active' } });
+    });
   });
 });

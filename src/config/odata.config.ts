@@ -1,5 +1,26 @@
 import moment from 'moment';
-import { ODataLiteConfig } from '../types';
+import { FieldDefinition, ODataLiteConfig } from '../types';
+
+const ALL_TYPES: FieldDefinition['type'][] = ['date', 'string', 'number', 'boolean'];
+
+function toComparable(
+  value: string,
+  type: FieldDefinition['type'],
+  boundary: 'start' | 'end' = 'start',
+): unknown {
+  switch (type) {
+    case 'date':
+      return boundary === 'end'
+        ? moment(value).endOf('day').toDate()
+        : moment(value).startOf('day').toDate();
+    case 'number':
+      return Number(value);
+    case 'boolean':
+      return value === 'true';
+    default:
+      return value;
+  }
+}
 
 export const odataConfig = {
   fields: {
@@ -14,52 +35,44 @@ export const odataConfig = {
 
   operators: {
     eq: {
-      allowedTypes: ['string', 'number', 'boolean'],
-      toMongo: (field: string, value: string) => ({
-        [field]: { $eq: value },
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({
+        [field]: { $eq: toComparable(value, type) },
       }),
     },
 
     ne: {
-      allowedTypes: ['string', 'number', 'boolean'],
-      toMongo: (field: string, value: string) => ({
-        [field]: { $ne: value },
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({
+        [field]: { $ne: toComparable(value, type) },
       }),
     },
 
     gt: {
-      allowedTypes: ['date', 'number'],
-      toMongo: (field: string, value: string) => ({
-        [field]: {
-          $gt: moment(value).startOf('day').toDate(),
-        },
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({
+        [field]: { $gt: toComparable(value, type, 'start') },
       }),
     },
 
     lt: {
-      allowedTypes: ['date', 'number'],
-      toMongo: (field: string, value: string) => ({
-        [field]: {
-          $lt: moment(value).endOf('day').toDate(),
-        },
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({
+        [field]: { $lt: toComparable(value, type, 'end') },
       }),
     },
 
     ge: {
-      allowedTypes: ['date', 'number'],
-      toMongo: (field: string, value: string) => ({
-        [field]: {
-          $gte: moment(value).startOf('day').toDate(),
-        },
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({
+        [field]: { $gte: toComparable(value, type, 'start') },
       }),
     },
 
     le: {
-      allowedTypes: ['date', 'number'],
-      toMongo: (field: string, value: string) => ({
-        [field]: {
-          $lte: moment(value).endOf('day').toDate(),
-        },
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({
+        [field]: { $lte: toComparable(value, type, 'end') },
       }),
     },
   },

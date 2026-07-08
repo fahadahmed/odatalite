@@ -223,7 +223,7 @@ describe.only('Validator', () => {
       expect(() => new Validator(stringFieldConfig).validate(ast)).to.not.throw();
     });
 
-    it('should reject eq for date fields', async () => {
+    it('should validate a valid eq comparison for date fields', () => {
       const ast: ASTNode = {
         type: 'comparison',
         field: 'metadata.accountPeriodBeginDate',
@@ -231,12 +231,7 @@ describe.only('Validator', () => {
         value: '2025-07-01',
       };
 
-      await expect((async () => validator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
-          expect(err).to.be.instanceOf(ODataLiteError);
-          expect(err.code).to.equal('OPERATOR_NOT_ALLOWED_FOR_FIELD_TYPE');
-        });
+      expect(() => validator.validate(ast)).to.not.throw();
     });
   });
 });

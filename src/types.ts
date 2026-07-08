@@ -5,7 +5,11 @@ export interface FieldDefinition {
 
 export interface OperatorDefinition {
   allowedTypes: string[];
-  toMongo: (field: string, value: string) => Record<string, unknown>;
+  toMongo: (
+    field: string,
+    value: string,
+    type: FieldDefinition['type'],
+  ) => Record<string, unknown>;
 }
 
 export interface ODataLiteConfig {
