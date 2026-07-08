@@ -5,6 +5,11 @@ export type Token =
   | { type: 'value'; value: string }
   | { type: 'and' }
   | { type: 'or' }
+  | { type: 'any' }
+  | { type: 'slash' }
+  | { type: 'lparen' }
+  | { type: 'rparen' }
+  | { type: 'colon' }
   | { type: 'eof' };
 
 export class Lexer {
@@ -38,6 +43,30 @@ export class Lexer {
         continue;
       }
 
+      if (c === '/') {
+        this.i++;
+        tokens.push({ type: 'slash' });
+        continue;
+      }
+
+      if (c === '(') {
+        this.i++;
+        tokens.push({ type: 'lparen' });
+        continue;
+      }
+
+      if (c === ')') {
+        this.i++;
+        tokens.push({ type: 'rparen' });
+        continue;
+      }
+
+      if (c === ':') {
+        this.i++;
+        tokens.push({ type: 'colon' });
+        continue;
+      }
+
       throw new ODataLiteError({
         code: 'INVALID_CHARACTER',
         message: `Unexpected character '${c}' encountered while tokenising filter`,
@@ -67,6 +96,10 @@ export class Lexer {
 
     if (value === 'or') {
       return { type: 'or' };
+    }
+
+    if (value === 'any') {
+      return { type: 'any' };
     }
 
     if (

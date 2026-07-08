@@ -1,6 +1,8 @@
 export interface FieldDefinition {
-  type: 'date' | 'string' | 'number' | 'boolean';
+  type: 'date' | 'string' | 'number' | 'boolean' | 'collection';
   operators?: string[];
+  /** Whitelisted sub-fields for a `collection` field, keyed by their dotted path within each element. Required when `type` is `collection`. */
+  items?: Record<string, FieldDefinition>;
 }
 
 export interface OperatorDefinition {

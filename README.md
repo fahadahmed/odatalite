@@ -122,12 +122,26 @@ metadata.isActive eq true
 
 | Operator | Meaning | Allowed field types |
 |---|---|---|
-| `eq` | equal | `string`, `number`, `boolean` |
-| `ne` | not equal | `string`, `number`, `boolean` |
-| `gt` | greater than | `date`, `number` |
-| `lt` | less than | `date`, `number` |
-| `ge` | greater than or equal | `date`, `number` |
-| `le` | less than or equal | `date`, `number` |
+| `eq` | equal | `date`, `string`, `number`, `boolean` |
+| `ne` | not equal | `date`, `string`, `number`, `boolean` |
+| `gt` | greater than | `date`, `string`, `number`, `boolean` |
+| `lt` | less than | `date`, `string`, `number`, `boolean` |
+| `ge` | greater than or equal | `date`, `string`, `number`, `boolean` |
+| `le` | less than or equal | `date`, `string`, `number`, `boolean` |
+
+## `any` lambda over collections
+
+A `collection`-typed field can be queried with the `any` lambda operator, which checks whether at least one element matches a predicate:
+
+```txt
+metadata.tags/any(t: t/name eq 'urgent')
+```
+
+The predicate supports `and`/`or` combinations, and every field referenced inside it must be prefixed with the lambda alias (`t/` above):
+
+```txt
+metadata.tags/any(t: t/name eq 'urgent' and t/priority gt 5)
+```
 
 ---
 
@@ -246,6 +260,10 @@ operators: {
 
 For `date` fields, values are validated against a strict `YYYY-MM-DD` format using a Zod schema. Invalid values throw `INVALID_VALUE`.
 
+### `any` validation
+
+For an `any` node, the referenced field must exist in `config.fields` and be declared with `type: 'collection'` and an `items` map (otherwise `INVALID_FIELD` / `FIELD_NOT_A_COLLECTION`). Every field inside the predicate must be prefixed with the lambda alias (`INVALID_ALIAS_REFERENCE` otherwise), and must resolve to a sub-field whitelisted in `items` (`INVALID_FIELD` otherwise). The rest of the predicate — operator whitelisting, type compatibility, value validation — is validated exactly like a top-level comparison.
+
 ---
 
 ## Mongo Builder
@@ -287,6 +305,16 @@ or, for `or` expressions:
 }
 ```
 
+An `any` node becomes an `$elemMatch`, with predicate fields resolved relative to the collection element (the alias prefix is stripped and remaining `/` segments are joined with `.`):
+
+```ts
+{
+  'metadata.tags': {
+    $elemMatch: { name: { $eq: 'urgent' } }
+  }
+}
+```
+
 ---
 
 # Configuration
@@ -309,49 +337,51 @@ export const odataConfig = {
 
   operators: {
     eq: {
-      allowedTypes: ['string', 'number', 'boolean'],
-      toMongo: (field, value) => ({
-        [field]: { $eq: value },
+      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      toMongo: (field, value, type) => ({
+        [field]: { $eq: toComparable(value, type) },
       }),
     },
 
     ne: {
-      allowedTypes: ['string', 'number', 'boolean'],
-      toMongo: (field, value) => ({
-        [field]: { $ne: value },
+      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      toMongo: (field, value, type) => ({
+        [field]: { $ne: toComparable(value, type) },
       }),
     },
 
     gt: {
-      allowedTypes: ['date', 'number'],
-      toMongo: (field, value) => ({
-        [field]: { $gt: moment(value).endOf('day').toDate() },
+      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      toMongo: (field, value, type) => ({
+        [field]: { $gt: toComparable(value, type, 'start') },
       }),
     },
 
     lt: {
-      allowedTypes: ['date', 'number'],
-      toMongo: (field, value) => ({
-        [field]: { $lt: moment(value).startOf('day').toDate() },
+      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      toMongo: (field, value, type) => ({
+        [field]: { $lt: toComparable(value, type, 'end') },
       }),
     },
 
     ge: {
-      allowedTypes: ['date', 'number'],
-      toMongo: (field, value) => ({
-        [field]: { $gte: moment(value).startOf('day').toDate() },
+      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      toMongo: (field, value, type) => ({
+        [field]: { $gte: toComparable(value, type, 'start') },
       }),
     },
 
     le: {
-      allowedTypes: ['date', 'number'],
-      toMongo: (field, value) => ({
-        [field]: { $lte: moment(value).endOf('day').toDate() },
+      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      toMongo: (field, value, type) => ({
+        [field]: { $lte: toComparable(value, type, 'end') },
       }),
     },
   },
 };
 ```
+
+`toComparable` converts the raw string value based on the field's type: dates use day boundaries via `moment`, numbers become `Number(value)`, booleans become `value === 'true'`, and strings pass through unchanged.
 
 ---
 
@@ -422,6 +452,8 @@ ODataLiteError
 | `INVALID_OPERATOR` | Validator | Operator is not configured |
 | `OPERATOR_NOT_ALLOWED_FOR_FIELD_TYPE` | Validator | Operator does not support the field's type |
 | `INVALID_VALUE` | Validator | Value fails type-specific validation (e.g. date format) |
+| `FIELD_NOT_A_COLLECTION` | Validator | `any` used on a field not declared as `type: 'collection'` |
+| `INVALID_ALIAS_REFERENCE` | Validator | A predicate field inside `any(...)` doesn't reference the lambda alias |
 
 ## Error Flow
 
@@ -470,6 +502,20 @@ Add an entry to `config.fields` with a `type` matching one of: `date`, `string`,
 }
 ```
 
+## Adding a collection field for `any`
+
+Declare `type: 'collection'` with an `items` map whitelisting the sub-fields allowed inside the lambda predicate, keyed by their dotted path within each element.
+
+```ts
+'metadata.tags': {
+  type: 'collection',
+  items: {
+    name: { type: 'string' },
+    priority: { type: 'number' },
+  },
+}
+```
+
 ## Adding a new operator
 
 Add an entry to `config.operators` with `allowedTypes` declaring which field types it supports, and a `toMongo` function that produces the MongoDB query fragment.
@@ -507,12 +553,6 @@ Potential future capabilities include:
 
 ```txt
 (A and B) or C
-```
-
-## `any` lambda support over collections
-
-```txt
-Tags/any(t: t/name eq 'urgent')
 ```
 
 ## Additional operators

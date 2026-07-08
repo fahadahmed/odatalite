@@ -76,6 +76,26 @@ describe('Lexer', () => {
     ]);
   });
 
+  it('should tokenize an any lambda expression', () => {
+    const lexer = new Lexer("metadata.tags/any(t: t/name eq 'urgent')");
+
+    expect(lexer.tokenize()).to.deep.equal([
+      { type: 'identifier', value: 'metadata.tags' },
+      { type: 'slash' },
+      { type: 'any' },
+      { type: 'lparen' },
+      { type: 'identifier', value: 't' },
+      { type: 'colon' },
+      { type: 'identifier', value: 't' },
+      { type: 'slash' },
+      { type: 'identifier', value: 'name' },
+      { type: 'operator', value: 'eq' },
+      { type: 'value', value: 'urgent' },
+      { type: 'rparen' },
+      { type: 'eof' },
+    ]);
+  });
+
   it('should throw ODataLiteError for an unterminated string literal', () => {
     const lexer = new Lexer("metadata.status eq 'active");
     try {
@@ -89,7 +109,7 @@ describe('Lexer', () => {
   });
 
   it('should throw ODataLiteError for invalid characters', () => {
-    const lexer = new Lexer('metadata.accountPeriodBeginDate ge 2025/07/01');
+    const lexer = new Lexer('metadata.accountPeriodBeginDate ge 2025#07#01');
     try {
       lexer.tokenize();
       expect.fail('Expected ODataLiteError');

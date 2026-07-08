@@ -1,4 +1,4 @@
-export type ASTNode = LogicalNode | ComparisonNode;
+export type ASTNode = LogicalNode | ComparisonNode | AnyNode;
 
 export interface LogicalNode {
   type: 'logical';
@@ -12,4 +12,11 @@ export interface ComparisonNode {
   field: string;
   operator: string;
   value: string;
+}
+
+export interface AnyNode {
+  type: 'any';
+  field: string;
+  alias: string;
+  predicate: ASTNode;
 }

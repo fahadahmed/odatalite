@@ -35,10 +35,10 @@ export class Parser {
   }
 
   private parseAnd(): ASTNode {
-    let left = this.parseComparison();
+    let left = this.parsePrimary();
 
     while (this.match('and')) {
-      const right = this.parseComparison();
+      const right = this.parsePrimary();
 
       left = {
         type: 'logical',
@@ -50,8 +50,17 @@ export class Parser {
     return left;
   }
 
-  private parseComparison(): ASTNode {
-    const field = this.consume('identifier').value;
+  private parsePrimary(): ASTNode {
+    let field = this.consume('identifier').value;
+
+    while (this.match('slash')) {
+      if (this.check('any')) {
+        return this.parseAny(field);
+      }
+
+      field += '/' + this.consume('identifier').value;
+    }
+
     const operator = this.consume('operator').value;
     const value = this.consume('value').value;
 
@@ -68,6 +77,26 @@ export class Parser {
       operator,
       value,
     };
+  }
+
+  private parseAny(field: string): ASTNode {
+    this.consume('any');
+    this.consume('lparen');
+    const alias = this.consume('identifier').value;
+    this.consume('colon');
+    const predicate = this.parseOr();
+    this.consume('rparen');
+
+    return {
+      type: 'any',
+      field,
+      alias,
+      predicate,
+    };
+  }
+
+  private check(type: Token['type']): boolean {
+    return this.tokens[this.current]?.type === type;
   }
 
   private match(type: Token['type']): boolean {

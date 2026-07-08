@@ -180,4 +180,94 @@ describe('MongoBuilder', () => {
       expect(ge).to.deep.equal({ 'metadata.status': { $gte: 'active' } });
     });
   });
+
+  describe('any operator', () => {
+    const config: ODataLiteConfig = {
+      fields: {
+        'metadata.tags': {
+          type: 'collection',
+          items: {
+            name: { type: 'string' },
+            priority: { type: 'number' },
+          },
+        },
+      },
+      operators: odataConfig.operators,
+    };
+    const anyBuilder = new MongoBuilder(config);
+
+    it('should build an elemMatch query for a simple any predicate', () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.tags',
+        alias: 't',
+        predicate: {
+          type: 'comparison',
+          field: 't/name',
+          operator: 'eq',
+          value: 'urgent',
+        },
+      };
+
+      const result = anyBuilder.build(ast);
+
+      expect(result).to.deep.equal({
+        'metadata.tags': { $elemMatch: { name: { $eq: 'urgent' } } },
+      });
+    });
+
+    it('should resolve the sub-field type declared under items', () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.tags',
+        alias: 't',
+        predicate: {
+          type: 'comparison',
+          field: 't/priority',
+          operator: 'gt',
+          value: '5',
+        },
+      };
+
+      const result = anyBuilder.build(ast);
+
+      expect(result).to.deep.equal({
+        'metadata.tags': { $elemMatch: { priority: { $gt: 5 } } },
+      });
+    });
+
+    it('should build a logical predicate inside an any as $and', () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.tags',
+        alias: 't',
+        predicate: {
+          type: 'logical',
+          operator: 'and',
+          left: {
+            type: 'comparison',
+            field: 't/name',
+            operator: 'eq',
+            value: 'urgent',
+          },
+          right: {
+            type: 'comparison',
+            field: 't/priority',
+            operator: 'gt',
+            value: '5',
+          },
+        },
+      };
+
+      const result = anyBuilder.build(ast);
+
+      expect(result).to.deep.equal({
+        'metadata.tags': {
+          $elemMatch: {
+            $and: [{ name: { $eq: 'urgent' } }, { priority: { $gt: 5 } }],
+          },
+        },
+      });
+    });
+  });
 });

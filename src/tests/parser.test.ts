@@ -64,6 +64,37 @@ describe('Parser', () => {
     expect((ast as { left: { type: string; operator: string } }).left.operator).to.equal('and');
   });
 
+  it('should parse an any lambda expression', () => {
+    const tokens = new Lexer("metadata.tags/any(t: t/name eq 'urgent')").tokenize();
+
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+
+    expect(ast).to.deep.equal({
+      type: 'any',
+      field: 'metadata.tags',
+      alias: 't',
+      predicate: {
+        type: 'comparison',
+        field: 't/name',
+        operator: 'eq',
+        value: 'urgent',
+      },
+    });
+  });
+
+  it('should parse an any lambda expression with a logical predicate', () => {
+    const tokens = new Lexer(
+      "metadata.tags/any(t: t/name eq 'urgent' and t/priority gt 5)"
+    ).tokenize();
+
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+
+    expect(ast.type).to.equal('any');
+    expect((ast as { predicate: { type: string } }).predicate.type).to.equal('logical');
+  });
+
   it('should throw ODataLiteError for an empty quoted value', () => {
     const tokens = new Lexer("metadata.status eq ''").tokenize();
     const parser = new Parser(tokens);

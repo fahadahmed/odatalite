@@ -193,6 +193,149 @@ describe.only('Validator', () => {
     });
   });
 
+  describe('any operator validation', () => {
+    const collectionConfig: ODataLiteConfig = {
+      fields: {
+        ...odataConfig.fields,
+        'metadata.tags': {
+          type: 'collection',
+          items: {
+            name: { type: 'string' },
+            priority: { type: 'number' },
+          },
+        },
+      },
+      operators: odataConfig.operators,
+    };
+    const collectionValidator = new Validator(collectionConfig);
+
+    it('should validate a valid any comparison', () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.tags',
+        alias: 't',
+        predicate: {
+          type: 'comparison',
+          field: 't/name',
+          operator: 'eq',
+          value: 'urgent',
+        },
+      };
+
+      expect(() => collectionValidator.validate(ast)).to.not.throw();
+    });
+
+    it('should validate an any comparison with a logical predicate', () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.tags',
+        alias: 't',
+        predicate: {
+          type: 'logical',
+          operator: 'and',
+          left: {
+            type: 'comparison',
+            field: 't/name',
+            operator: 'eq',
+            value: 'urgent',
+          },
+          right: {
+            type: 'comparison',
+            field: 't/priority',
+            operator: 'gt',
+            value: '5',
+          },
+        },
+      };
+
+      expect(() => collectionValidator.validate(ast)).to.not.throw();
+    });
+
+    it('should reject any on a non-collection field', async () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.accountPeriodBeginDate',
+        alias: 't',
+        predicate: {
+          type: 'comparison',
+          field: 't/name',
+          operator: 'eq',
+          value: 'urgent',
+        },
+      };
+
+      await expect((async () => collectionValidator.validate(ast))())
+        .to.be.rejected
+        .then((err: ODataLiteError) => {
+          expect(err).to.be.instanceOf(ODataLiteError);
+          expect(err.code).to.equal('FIELD_NOT_A_COLLECTION');
+        });
+    });
+
+    it('should reject any on an unregistered collection field', async () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.unknownTags',
+        alias: 't',
+        predicate: {
+          type: 'comparison',
+          field: 't/name',
+          operator: 'eq',
+          value: 'urgent',
+        },
+      };
+
+      await expect((async () => collectionValidator.validate(ast))())
+        .to.be.rejected
+        .then((err: ODataLiteError) => {
+          expect(err).to.be.instanceOf(ODataLiteError);
+          expect(err.code).to.equal('INVALID_FIELD');
+        });
+    });
+
+    it('should reject a predicate field not referencing the lambda alias', async () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.tags',
+        alias: 't',
+        predicate: {
+          type: 'comparison',
+          field: 'name',
+          operator: 'eq',
+          value: 'urgent',
+        },
+      };
+
+      await expect((async () => collectionValidator.validate(ast))())
+        .to.be.rejected
+        .then((err: ODataLiteError) => {
+          expect(err).to.be.instanceOf(ODataLiteError);
+          expect(err.code).to.equal('INVALID_ALIAS_REFERENCE');
+        });
+    });
+
+    it('should reject a predicate field not whitelisted in items', async () => {
+      const ast: ASTNode = {
+        type: 'any',
+        field: 'metadata.tags',
+        alias: 't',
+        predicate: {
+          type: 'comparison',
+          field: 't/secret',
+          operator: 'eq',
+          value: 'urgent',
+        },
+      };
+
+      await expect((async () => collectionValidator.validate(ast))())
+        .to.be.rejected
+        .then((err: ODataLiteError) => {
+          expect(err).to.be.instanceOf(ODataLiteError);
+          expect(err.code).to.equal('INVALID_FIELD');
+        });
+    });
+  });
+
   describe('eq / ne validation', () => {
     const stringFieldConfig: ODataLiteConfig = {
       fields: {

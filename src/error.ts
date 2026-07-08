@@ -5,7 +5,9 @@ export type ODataLiteErrorCode =
   | 'INVALID_OPERATOR'
   | 'OPERATOR_NOT_ALLOWED_FOR_FIELD_TYPE'
   | 'INVALID_VALUE'
-  | 'UNEXPECTED_TOKEN';
+  | 'UNEXPECTED_TOKEN'
+  | 'FIELD_NOT_A_COLLECTION'
+  | 'INVALID_ALIAS_REFERENCE';
 
 export interface ODataLiteErrorOptions {
   code: ODataLiteErrorCode;

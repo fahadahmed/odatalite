@@ -3,6 +3,7 @@ import moment from 'moment';
 import { createODataLite } from '../createODataLite';
 import { odataConfig } from '../config/odata.config';
 import { ODataLiteError } from '../error';
+import { ODataLiteConfig } from '../types';
 
 describe('createODataLite', () => {
   const odata = createODataLite(odataConfig);
@@ -40,6 +41,42 @@ describe('createODataLite', () => {
     expect(() => odata.parse('metadata.accountPeriodBeginDate ge')).to.throw(
       ODataLiteError
     );
+  });
+
+  it('should parse and convert an any lambda expression to a mongo query', () => {
+    const collectionConfig: ODataLiteConfig = {
+      fields: {
+        ...odataConfig.fields,
+        'metadata.tags': {
+          type: 'collection',
+          items: {
+            name: { type: 'string' },
+          },
+        },
+      },
+      operators: odataConfig.operators,
+    };
+    const collectionOdata = createODataLite(collectionConfig);
+
+    const ast = collectionOdata.parse("metadata.tags/any(t: t/name eq 'urgent')");
+
+    expect(ast).to.deep.equal({
+      type: 'any',
+      field: 'metadata.tags',
+      alias: 't',
+      predicate: {
+        type: 'comparison',
+        field: 't/name',
+        operator: 'eq',
+        value: 'urgent',
+      },
+    });
+
+    const mongoQuery = collectionOdata.toMongo(ast);
+
+    expect(mongoQuery).to.deep.equal({
+      'metadata.tags': { $elemMatch: { name: { $eq: 'urgent' } } },
+    });
   });
 
   it('should throw ODataLiteError when the field is not whitelisted', () => {
