@@ -84,4 +84,100 @@ describe('createODataLite', () => {
       ODataLiteError
     );
   });
+
+  it('should parse and convert an any lambda expression on factSubjectClient.subjectClients', () => {
+    const ast = odata.parse(
+      "factSubjectClient.subjectClients/any(c: c/clientIdentifierValueID eq '428578998')"
+    );
+
+    expect(ast).to.deep.equal({
+      type: 'any',
+      field: 'factSubjectClient.subjectClients',
+      alias: 'c',
+      predicate: {
+        type: 'comparison',
+        field: 'c/clientIdentifierValueID',
+        operator: 'eq',
+        value: '428578998',
+      },
+    });
+
+    const mongoQuery = odata.toMongo(ast);
+
+    expect(mongoQuery).to.deep.equal({
+      'factSubjectClient.subjectClients': {
+        $elemMatch: { clientIdentifierValueID: { $eq: '428578998' } },
+      },
+    });
+  });
+
+  it('should parse and convert an any lambda expression on interactionLink.related', () => {
+    const ast = odata.parse(
+      "interactionLink.related/any(r: r/linkName eq 'taxRtnTrst' and r/transactionID eq 3200000000001)"
+    );
+
+    const mongoQuery = odata.toMongo(ast);
+
+    expect(mongoQuery).to.deep.equal({
+      'interactionLink.related': {
+        $elemMatch: {
+          $and: [
+            { linkName: { $eq: 'taxRtnTrst' } },
+            { transactionID: { $eq: 3200000000001 } },
+          ],
+        },
+      },
+    });
+  });
+
+  it('should combine an any lambda expression with a top-level comparison via and', () => {
+    const ast = odata.parse(
+      'factSubjectClient.subjectClients/any(c:c/statusCode ge 300) and metadata.accountPeriodBeginDate ge 2027-07-01'
+    );
+
+    expect(ast).to.deep.equal({
+      type: 'logical',
+      operator: 'and',
+      left: {
+        type: 'any',
+        field: 'factSubjectClient.subjectClients',
+        alias: 'c',
+        predicate: {
+          type: 'comparison',
+          field: 'c/statusCode',
+          operator: 'ge',
+          value: '300',
+        },
+      },
+      right: {
+        type: 'comparison',
+        field: 'metadata.accountPeriodBeginDate',
+        operator: 'ge',
+        value: '2027-07-01',
+      },
+    });
+
+    const mongoQuery = odata.toMongo(ast);
+
+    expect(mongoQuery).to.deep.equal({
+      $and: [
+        {
+          'factSubjectClient.subjectClients': {
+            $elemMatch: { statusCode: { $gte: 300 } },
+          },
+        },
+        {
+          'metadata.accountPeriodBeginDate': {
+            $gte: moment('2027-07-01').startOf('day').toDate(),
+          },
+        },
+      ],
+    });
+  });
+
+  it('should throw ODataLiteError when a slash-joined path is used instead of the dotted collection key', () => {
+    expect(() =>
+      odata.parse('factSubjectClient/subjectClients/any(c:c/statusCode ge 300)')
+    ).to.throw(ODataLiteError);
+  });
 });

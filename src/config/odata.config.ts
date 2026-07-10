@@ -31,6 +31,24 @@ export const odataConfig = {
     'metadata.accountPeriodEndDate': {
       type: 'date',
     },
+
+    'factSubjectClient.subjectClients': {
+      type: 'collection',
+      items: {
+        statusCode: { type: 'number' },
+        clientIdentifierTypeCode: { type: 'string' },
+        clientIdentifierValueID: { type: 'string' },
+        coreProcessingTransactionID: { type: 'number' },
+      },
+    },
+
+    'interactionLink.related': {
+      type: 'collection',
+      items: {
+        linkName: { type: 'string' },
+        transactionID: { type: 'number' },
+      },
+    },
   },
 
   operators: {
