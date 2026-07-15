@@ -1,18 +1,18 @@
 import { expect } from '../../testing/setup';
 import { Validator } from '../validator';
-import { odataConfig } from '../config/odata.config';
+import { testConfig } from './fixtures/testConfig';
 import { ODataLiteError } from '../error';
 import { ASTNode } from '../ast';
 import { ODataLiteConfig } from '../types';
 
-describe.only('Validator', () => {
-  const validator = new Validator(odataConfig);
+describe('Validator', () => {
+  const validator = new Validator(testConfig);
 
   describe('comparison validation', () => {
     it('should validate a valid ge comparison', () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodBeginDate',
+        field: 'order.createdAt',
         operator: 'ge',
         value: '2025-07-01',
       };
@@ -23,7 +23,7 @@ describe.only('Validator', () => {
     it('should validate a valid gt comparison', () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodBeginDate',
+        field: 'order.createdAt',
         operator: 'gt',
         value: '2025-07-01',
       };
@@ -34,7 +34,7 @@ describe.only('Validator', () => {
     it('should validate a valid le comparison', () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodEndDate',
+        field: 'order.updatedAt',
         operator: 'le',
         value: '2026-07-01',
       };
@@ -45,7 +45,7 @@ describe.only('Validator', () => {
     it('should validate a valid lt comparison', () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodEndDate',
+        field: 'order.updatedAt',
         operator: 'lt',
         value: '2026-06-30',
       };
@@ -61,34 +61,32 @@ describe.only('Validator', () => {
         value: '2025-07-01',
       };
 
-      await expect((async () => validator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
+      await expect((async () => validator.validate(ast))()).to.be.rejected.then(
+        (err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('INVALID_FIELD');
           expect(err.token).to.equal('invalid.field');
-          expect(err.message).to.equal(
-            "Field 'invalid.field' is not allowed in OData filter",
-          );
-        });
+          expect(err.message).to.equal("Field 'invalid.field' is not allowed in OData filter");
+        },
+      );
     });
 
     it('should reject unsupported operators', async () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodBeginDate',
+        field: 'order.createdAt',
         operator: 'contains',
         value: '2025-07-01',
       };
 
-      await expect((async () => validator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
+      await expect((async () => validator.validate(ast))()).to.be.rejected.then(
+        (err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('INVALID_OPERATOR');
           expect(err.token).to.equal('contains');
           expect(err.message).to.equal("Operator 'contains' is not supported");
-        });
+        },
+      );
     });
 
     it('should reject operators not allowed for the field type', async () => {
@@ -111,34 +109,32 @@ describe.only('Validator', () => {
         value: 'active',
       };
 
-      await expect((async () => new Validator(stringFieldConfig).validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
-          expect(err).to.be.instanceOf(ODataLiteError);
-          expect(err.code).to.equal('OPERATOR_NOT_ALLOWED_FOR_FIELD_TYPE');
-          expect(err.token).to.equal('ge');
-          expect(err.message).to.equal(
-            "Operator 'ge' is not allowed for field type 'string'",
-          );
-        });
+      await expect(
+        (async () => new Validator(stringFieldConfig).validate(ast))(),
+      ).to.be.rejected.then((err: ODataLiteError) => {
+        expect(err).to.be.instanceOf(ODataLiteError);
+        expect(err.code).to.equal('OPERATOR_NOT_ALLOWED_FOR_FIELD_TYPE');
+        expect(err.token).to.equal('ge');
+        expect(err.message).to.equal("Operator 'ge' is not allowed for field type 'string'");
+      });
     });
 
     it('should reject invalid dates', async () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodBeginDate',
+        field: 'order.createdAt',
         operator: 'ge',
         value: '07-01-2025',
       };
 
-      await expect((async () => validator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
+      await expect((async () => validator.validate(ast))()).to.be.rejected.then(
+        (err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('INVALID_VALUE');
           expect(err.token).to.equal('07-01-2025');
           expect(err.message).to.equal("Invalid date value '07-01-2025'");
-        });
+        },
+      );
     });
   });
 
@@ -147,7 +143,7 @@ describe.only('Validator', () => {
       fields: {
         'metadata.status': { type: 'string' },
       },
-      operators: odataConfig.operators,
+      operators: testConfig.operators,
     };
 
     it('should validate a valid in comparison', () => {
@@ -164,7 +160,7 @@ describe.only('Validator', () => {
     it('should validate each date value in an in comparison', () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodBeginDate',
+        field: 'order.createdAt',
         operator: 'in',
         value: ['2025-07-01', '2026-06-30'],
       };
@@ -175,18 +171,18 @@ describe.only('Validator', () => {
     it('should reject an in comparison with an invalid date value', async () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodBeginDate',
+        field: 'order.createdAt',
         operator: 'in',
         value: ['2025-07-01', '07-01-2025'],
       };
 
-      await expect((async () => validator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
+      await expect((async () => validator.validate(ast))()).to.be.rejected.then(
+        (err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('INVALID_VALUE');
           expect(err.token).to.equal('07-01-2025');
-        });
+        },
+      );
     });
   });
 
@@ -197,13 +193,13 @@ describe.only('Validator', () => {
         operator: 'and',
         left: {
           type: 'comparison',
-          field: 'metadata.accountPeriodBeginDate',
+          field: 'order.createdAt',
           operator: 'ge',
           value: '2025-07-01',
         },
         right: {
           type: 'comparison',
-          field: 'metadata.accountPeriodEndDate',
+          field: 'order.updatedAt',
           operator: 'le',
           value: '2026-06-30',
         },
@@ -217,7 +213,7 @@ describe.only('Validator', () => {
         fields: {
           'metadata.status': { type: 'string' },
         },
-        operators: odataConfig.operators,
+        operators: testConfig.operators,
       };
 
       const ast: ASTNode = {
@@ -244,7 +240,7 @@ describe.only('Validator', () => {
   describe('any operator validation', () => {
     const collectionConfig: ODataLiteConfig = {
       fields: {
-        ...odataConfig.fields,
+        ...testConfig.fields,
         'metadata.tags': {
           type: 'collection',
           items: {
@@ -253,7 +249,7 @@ describe.only('Validator', () => {
           },
         },
       },
-      operators: odataConfig.operators,
+      operators: testConfig.operators,
     };
     const collectionValidator = new Validator(collectionConfig);
 
@@ -302,7 +298,7 @@ describe.only('Validator', () => {
     it('should reject any on a non-collection field', async () => {
       const ast: ASTNode = {
         type: 'any',
-        field: 'metadata.accountPeriodBeginDate',
+        field: 'order.createdAt',
         alias: 't',
         predicate: {
           type: 'comparison',
@@ -312,12 +308,12 @@ describe.only('Validator', () => {
         },
       };
 
-      await expect((async () => collectionValidator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
+      await expect((async () => collectionValidator.validate(ast))()).to.be.rejected.then(
+        (err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('FIELD_NOT_A_COLLECTION');
-        });
+        },
+      );
     });
 
     it('should reject any on an unregistered collection field', async () => {
@@ -333,12 +329,12 @@ describe.only('Validator', () => {
         },
       };
 
-      await expect((async () => collectionValidator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
+      await expect((async () => collectionValidator.validate(ast))()).to.be.rejected.then(
+        (err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('INVALID_FIELD');
-        });
+        },
+      );
     });
 
     it('should reject a predicate field not referencing the lambda alias', async () => {
@@ -354,12 +350,12 @@ describe.only('Validator', () => {
         },
       };
 
-      await expect((async () => collectionValidator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
+      await expect((async () => collectionValidator.validate(ast))()).to.be.rejected.then(
+        (err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('INVALID_ALIAS_REFERENCE');
-        });
+        },
+      );
     });
 
     it('should reject a predicate field not whitelisted in items', async () => {
@@ -375,12 +371,12 @@ describe.only('Validator', () => {
         },
       };
 
-      await expect((async () => collectionValidator.validate(ast))())
-        .to.be.rejected
-        .then((err: ODataLiteError) => {
+      await expect((async () => collectionValidator.validate(ast))()).to.be.rejected.then(
+        (err: ODataLiteError) => {
           expect(err).to.be.instanceOf(ODataLiteError);
           expect(err.code).to.equal('INVALID_FIELD');
-        });
+        },
+      );
     });
   });
 
@@ -389,7 +385,7 @@ describe.only('Validator', () => {
       fields: {
         'metadata.status': { type: 'string' },
       },
-      operators: odataConfig.operators,
+      operators: testConfig.operators,
     };
 
     it('should validate a valid eq comparison', () => {
@@ -417,7 +413,7 @@ describe.only('Validator', () => {
     it('should validate a valid eq comparison for date fields', () => {
       const ast: ASTNode = {
         type: 'comparison',
-        field: 'metadata.accountPeriodBeginDate',
+        field: 'order.createdAt',
         operator: 'eq',
         value: '2025-07-01',
       };

@@ -4,14 +4,14 @@ import { ODataLiteError } from '../error';
 
 describe('Lexer', () => {
   it('should tokenize a valid comparison expression', () => {
-    const lexer = new Lexer('metadata.accountPeriodBeginDate ge 2025-07-01');
+    const lexer = new Lexer('order.createdAt ge 2025-07-01');
 
     const tokens = lexer.tokenize();
 
     expect(tokens).to.deep.equal([
       {
         type: 'identifier',
-        value: 'metadata.accountPeriodBeginDate',
+        value: 'order.createdAt',
       },
       {
         type: 'operator',
@@ -28,17 +28,13 @@ describe('Lexer', () => {
   });
 
   it('should tokenize chained and expression', () => {
-    const lexer = new Lexer(
-      'metadata.accountPeriodBeginDate ge 2025-07-01 and metadata.accountPeriodEndDate le 2026-06-30'
-    );
+    const lexer = new Lexer('order.createdAt ge 2025-07-01 and order.updatedAt le 2026-06-30');
     const tokens = lexer.tokenize();
     expect(tokens.some((t) => t.type === 'and')).to.equal(true);
   });
 
   it('should tokenize chained or expression', () => {
-    const lexer = new Lexer(
-      'metadata.accountPeriodBeginDate eq 2025-07-01 or metadata.accountPeriodEndDate eq 2026-06-30'
-    );
+    const lexer = new Lexer('order.createdAt eq 2025-07-01 or order.updatedAt eq 2026-06-30');
     const tokens = lexer.tokenize();
     expect(tokens.some((t) => t.type === 'or')).to.equal(true);
   });
@@ -112,10 +108,10 @@ describe('Lexer', () => {
   });
 
   it('should tokenize an in expression with unquoted date values', () => {
-    const lexer = new Lexer('metadata.accountPeriodBeginDate in (2025-07-01,2025-08-01)');
+    const lexer = new Lexer('order.createdAt in (2025-07-01,2025-08-01)');
 
     expect(lexer.tokenize()).to.deep.equal([
-      { type: 'identifier', value: 'metadata.accountPeriodBeginDate' },
+      { type: 'identifier', value: 'order.createdAt' },
       { type: 'operator', value: 'in' },
       { type: 'lparen' },
       { type: 'value', value: '2025-07-01' },
@@ -139,7 +135,7 @@ describe('Lexer', () => {
   });
 
   it('should throw ODataLiteError for invalid characters', () => {
-    const lexer = new Lexer('metadata.accountPeriodBeginDate ge 2025#07#01');
+    const lexer = new Lexer('order.createdAt ge 2025#07#01');
     try {
       lexer.tokenize();
       expect.fail('Expected ODataLiteError');

@@ -5,14 +5,14 @@ import { ODataLiteError } from '../error';
 
 describe('Parser', () => {
   it('should parse a comparison expression', () => {
-    const tokens = new Lexer('metadata.accountPeriodBeginDate ge 2025-07-01').tokenize();
+    const tokens = new Lexer('order.createdAt ge 2025-07-01').tokenize();
 
     const parser = new Parser(tokens);
     const ast = parser.parse();
 
     expect(ast).to.deep.equal({
       type: 'comparison',
-      field: 'metadata.accountPeriodBeginDate',
+      field: 'order.createdAt',
       operator: 'ge',
       value: '2025-07-01',
     });
@@ -20,7 +20,7 @@ describe('Parser', () => {
 
   it('should parse logical and expressions', () => {
     const tokens = new Lexer(
-      'metadata.accountPeriodBeginDate ge 2025-07-01 and metadata.accountPeriodEndDate le 2026-06-30'
+      'order.createdAt ge 2025-07-01 and order.updatedAt le 2026-06-30',
     ).tokenize();
     const parser = new Parser(tokens);
     const ast = parser.parse();
@@ -43,7 +43,7 @@ describe('Parser', () => {
 
   it('should parse logical or expressions', () => {
     const tokens = new Lexer(
-      "metadata.status eq 'active' or metadata.status eq 'pending'"
+      "metadata.status eq 'active' or metadata.status eq 'pending'",
     ).tokenize();
     const parser = new Parser(tokens);
     const ast = parser.parse();
@@ -53,7 +53,7 @@ describe('Parser', () => {
 
   it('should parse and with higher precedence than or', () => {
     const tokens = new Lexer(
-      "metadata.status eq 'active' and metadata.accountPeriodBeginDate ge 2025-07-01 or metadata.status eq 'pending'"
+      "metadata.status eq 'active' and order.createdAt ge 2025-07-01 or metadata.status eq 'pending'",
     ).tokenize();
     const parser = new Parser(tokens);
     const ast = parser.parse();
@@ -85,7 +85,7 @@ describe('Parser', () => {
 
   it('should parse an any lambda expression with a logical predicate', () => {
     const tokens = new Lexer(
-      "metadata.tags/any(t: t/name eq 'urgent' and t/priority gt 5)"
+      "metadata.tags/any(t: t/name eq 'urgent' and t/priority gt 5)",
     ).tokenize();
 
     const parser = new Parser(tokens);
@@ -124,16 +124,14 @@ describe('Parser', () => {
   });
 
   it('should parse an in comparison expression with date values', () => {
-    const tokens = new Lexer(
-      'metadata.accountPeriodBeginDate in (2025-07-01,2025-08-01)'
-    ).tokenize();
+    const tokens = new Lexer('order.createdAt in (2025-07-01,2025-08-01)').tokenize();
 
     const parser = new Parser(tokens);
     const ast = parser.parse();
 
     expect(ast).to.deep.equal({
       type: 'comparison',
-      field: 'metadata.accountPeriodBeginDate',
+      field: 'order.createdAt',
       operator: 'in',
       value: ['2025-07-01', '2025-08-01'],
     });
@@ -153,7 +151,7 @@ describe('Parser', () => {
   });
 
   it('should throw ODataLiteError for malformed expression', () => {
-    const tokens = new Lexer('metadata.accountPeriodBeginDate ge').tokenize();
+    const tokens = new Lexer('order.createdAt ge').tokenize();
     const parser = new Parser(tokens);
     try {
       parser.parse();
