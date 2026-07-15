@@ -2,9 +2,9 @@
 
 ## Overview
 
-This utility implements a lightweight and secure subset of the OData `$filter` syntax for backend filtering of MongoDB queries.
+This package implements a lightweight and secure subset of the OData `$filter` syntax, translating it into MongoDB queries.
 
-The implementation is intentionally minimal and controlled to support:
+It is intentionally minimal and configuration-driven to support:
 
 - strict field/operator whitelisting
 - predictable query generation
@@ -24,6 +24,61 @@ Validator (whitelist enforcement)
    ↓
 Mongo Builder (query translation)
 ```
+
+---
+
+## Installation
+
+```bash
+pnpm add odata-lite
+```
+
+---
+
+## Quick start
+
+`odata-lite` ships no built-in field configuration — you define the whitelist of fields, types, and operators your application allows, and the parser enforces it.
+
+```ts
+import { createODataLite, ODataLiteError } from 'odata-lite';
+
+const odata = createODataLite({
+  fields: {
+    'order.status': { type: 'string' },
+    'order.createdAt': { type: 'date' },
+    'order.amount': { type: 'number' },
+  },
+  operators: {
+    eq: {
+      allowedTypes: ['string', 'date', 'number'],
+      toMongo: (field, value) => ({ [field]: { $eq: value } }),
+    },
+    ge: {
+      allowedTypes: ['date', 'number'],
+      toMongo: (field, value) => ({ [field]: { $gte: value } }),
+    },
+  },
+});
+
+try {
+  const ast = odata.parse("order.status eq 'active' and order.createdAt ge 2025-07-01");
+  const mongoQuery = odata.toMongo(ast);
+  // { $and: [{ 'order.status': { $eq: 'active' } }, { 'order.createdAt': { $gte: '2025-07-01' } }] }
+} catch (err) {
+  if (err instanceof ODataLiteError) {
+    // handle a rejected/invalid filter
+  }
+  throw err;
+}
+```
+
+See [Configuration](#configuration) below for a fuller example, including date handling and collection (`any`) fields.
+
+For runnable, end-to-end versions of this, see [examples/](examples/):
+
+- [examples/config.ts](examples/config.ts) — the reference config used by the examples below
+- [examples/basic-usage.ts](examples/basic-usage.ts) — parsing filters (including `any()`) and handling `ODataLiteError` (`pnpm example:basic`)
+- [examples/api-integration.ts](examples/api-integration.ts) — wiring a filter query param into an API route handler (`pnpm example:api`)
 
 ---
 
@@ -56,9 +111,7 @@ References:
 - https://www.odata.org/documentation/odata-version-3-0/odata-version-3-0-core-protocol/
 - https://www.odata.org/documentation/odata-version-2-0/uri-conventions/
 
-Australian Government API guidance:
-
-- https://api.gov.au/sections/interoperability/api-design.html
+`odata-lite` does not implement the full OData specification — see [Scope](#scope) below.
 
 ---
 
@@ -82,24 +135,30 @@ This implementation solves this by:
 
 ---
 
+# Scope
+
+`odata-lite` implements a whitelisted subset of the `$filter` query option only, targeting MongoDB. It does not implement `$select`, `$expand`, `$orderby`, `$top`/`$skip`, `$count`, `$apply`, batch requests, or any backend other than MongoDB. See [Future Extensions](#future-extensions) for the roadmap.
+
+---
+
 # Current Supported Syntax
 
 ## Single comparison
 
 ```txt
-metadata.accountPeriodBeginDate ge 2023-07-01
+order.createdAt ge 2023-07-01
 ```
 
 ## Multiple comparisons using `and`
 
 ```txt
-metadata.accountPeriodBeginDate ge 2023-07-01 and metadata.accountPeriodEndDate le 2026-06-30
+order.createdAt ge 2023-07-01 and order.updatedAt le 2026-06-30
 ```
 
 ## Multiple comparisons using `or`
 
 ```txt
-metadata.status eq 'active' or metadata.status eq 'pending'
+order.status eq 'active' or order.status eq 'pending'
 ```
 
 `and` binds tighter than `or` (no parentheses support yet), so:
@@ -115,8 +174,8 @@ parses as `(A and B) or C`.
 String values must be single-quoted; bare words are otherwise tokenized as identifiers, not values.
 
 ```txt
-metadata.status eq 'active'
-metadata.isActive eq true
+order.status eq 'active'
+order.isPaid eq true
 ```
 
 ## Value lists (`in`)
@@ -124,34 +183,36 @@ metadata.isActive eq true
 `in` checks a field against a parenthesized, comma-separated list of values. Each value follows the same literal rules as a single comparison (quoted strings, bare dates/numbers/booleans):
 
 ```txt
-metadata.status in ('active','pending')
-metadata.accountPeriodBeginDate in (2025-07-01,2025-08-01)
+order.status in ('active','pending')
+order.createdAt in (2025-07-01,2025-08-01)
 ```
 
 ## Supported operators
 
-| Operator | Meaning | Allowed field types |
-|---|---|---|
-| `eq` | equal | `date`, `string`, `number`, `boolean` |
-| `ne` | not equal | `date`, `string`, `number`, `boolean` |
-| `gt` | greater than | `date`, `string`, `number`, `boolean` |
-| `lt` | less than | `date`, `string`, `number`, `boolean` |
-| `ge` | greater than or equal | `date`, `string`, `number`, `boolean` |
-| `le` | less than or equal | `date`, `string`, `number`, `boolean` |
-| `in` | value is one of a list | `date`, `string`, `number`, `boolean` |
+| Operator | Meaning                | Allowed field types                   |
+| -------- | ---------------------- | ------------------------------------- |
+| `eq`     | equal                  | `date`, `string`, `number`, `boolean` |
+| `ne`     | not equal              | `date`, `string`, `number`, `boolean` |
+| `gt`     | greater than           | `date`, `string`, `number`, `boolean` |
+| `lt`     | less than              | `date`, `string`, `number`, `boolean` |
+| `ge`     | greater than or equal  | `date`, `string`, `number`, `boolean` |
+| `le`     | less than or equal     | `date`, `string`, `number`, `boolean` |
+| `in`     | value is one of a list | `date`, `string`, `number`, `boolean` |
+
+Every operator above is a reference implementation you can copy into your own config — none of it is built into the engine (see [Configuration](#configuration)).
 
 ## `any` lambda over collections
 
 A `collection`-typed field can be queried with the `any` lambda operator, which checks whether at least one element matches a predicate:
 
 ```txt
-metadata.tags/any(t: t/name eq 'urgent')
+order.items/any(i: i/sku eq 'ABC-123')
 ```
 
-The predicate supports `and`/`or` combinations, and every field referenced inside it must be prefixed with the lambda alias (`t/` above):
+The predicate supports `and`/`or` combinations, and every field referenced inside it must be prefixed with the lambda alias (`i/` above):
 
 ```txt
-metadata.tags/any(t: t/name eq 'urgent' and t/priority gt 5)
+order.items/any(i: i/sku eq 'ABC-123' and i/stock gt 5)
 ```
 
 ---
@@ -167,7 +228,7 @@ Example:
 Input:
 
 ```txt
-metadata.accountPeriodBeginDate ge 2023-07-01
+order.createdAt ge 2023-07-01
 ```
 
 Output:
@@ -176,7 +237,7 @@ Output:
 [
   {
     type: 'identifier',
-    value: 'metadata.accountPeriodBeginDate',
+    value: 'order.createdAt',
   },
   {
     type: 'operator',
@@ -202,7 +263,7 @@ Example AST:
 ```ts
 {
   type: 'comparison',
-  field: 'metadata.accountPeriodBeginDate',
+  field: 'order.createdAt',
   operator: 'ge',
   value: '2023-07-01'
 }
@@ -224,7 +285,7 @@ For `in`, `value` is an array instead of a single string:
 ```ts
 {
   type: 'comparison',
-  field: 'metadata.status',
+  field: 'order.status',
   operator: 'in',
   value: ['active', 'pending']
 }
@@ -290,39 +351,7 @@ For an `any` node, the referenced field must exist in `config.fields` and be dec
 
 ## Mongo Builder
 
-The Mongo builder converts the validated AST into MongoDB query conditions using the `toMongo` function defined per operator in the config.
-
-For `date` fields, `ge`/`le` widen the value to a day boundary (so they behave as an inclusive range over the whole day), while `eq`/`ne`/`gt`/`lt` compare against the exact UTC instant of the value:
-
-| Operator | MongoDB operator | Date conversion |
-|---|---|---|
-| `ge` | `$gte` | `moment(value).startOf('day').toDate()` — inclusive lower bound |
-| `le` | `$lte` | `moment(value).endOf('day').toDate()` — inclusive upper bound |
-| `eq` | `$eq` | `moment.utc(value).toDate()` — exact instant |
-| `ne` | `$ne` | `moment.utc(value).toDate()` — exact instant |
-| `gt` | `$gt` | `moment.utc(value).toDate()` — exact instant |
-| `lt` | `$lt` | `moment.utc(value).toDate()` — exact instant |
-| `in` | `$in` | `moment.utc(value).toDate()` per element — exact instant |
-
-`in` applies the same per-type conversion as `eq` to every element of the list, then wraps the result in `$in`:
-
-```ts
-{
-  'metadata.status': {
-    $in: ['active', 'pending']
-  }
-}
-```
-
-Example output for a single comparison:
-
-```ts
-{
-  'metadata.accountPeriodBeginDate': {
-    $gte: ISODate('2023-07-01T00:00:00.000Z')
-  }
-}
-```
+The Mongo builder converts the validated AST into MongoDB query conditions using the `toMongo` function defined per operator in the config. The specific date-boundary widening, numeric coercion, etc. shown in the examples below belong to the _reference_ operator implementations in [Configuration](#configuration) — the builder itself just calls whatever `toMongo` your config supplies.
 
 Logical expressions become:
 
@@ -344,8 +373,8 @@ An `any` node becomes an `$elemMatch`, with predicate fields resolved relative t
 
 ```ts
 {
-  'metadata.tags': {
-    $elemMatch: { name: { $eq: 'urgent' } }
+  'order.items': {
+    $elemMatch: { sku: { $eq: 'ABC-123' } }
   }
 }
 ```
@@ -354,76 +383,91 @@ An `any` node becomes an `$elemMatch`, with predicate fields resolved relative t
 
 # Configuration
 
-The parser is fully configuration-driven.
+The parser is fully configuration-driven — `odata-lite` ships no fields and no operators. You supply an `ODataLiteConfig` to `createODataLite`.
 
-## Current configuration
+## Example configuration
 
 ```ts
-export const odataConfig = {
-  fields: {
-    'metadata.accountPeriodBeginDate': {
-      type: 'date',
-    },
+import moment from 'moment'; // optional — any date library works
+import { ODataLiteConfig, FieldDefinition } from 'odata-lite';
 
-    'metadata.accountPeriodEndDate': {
-      type: 'date',
+const ALL_TYPES: FieldDefinition['type'][] = ['date', 'string', 'number', 'boolean'];
+
+function toComparable(
+  value: string,
+  type: FieldDefinition['type'],
+  boundary: 'exact' | 'start' | 'end' = 'exact',
+): unknown {
+  switch (type) {
+    case 'date':
+      if (boundary === 'start') return moment(value).startOf('day').toDate();
+      if (boundary === 'end') return moment(value).endOf('day').toDate();
+      return moment.utc(value).toDate();
+    case 'number':
+      return Number(value);
+    case 'boolean':
+      return value === 'true';
+    default:
+      return value;
+  }
+}
+
+export const config: ODataLiteConfig = {
+  fields: {
+    'order.createdAt': { type: 'date' },
+    'order.updatedAt': { type: 'date' },
+
+    'order.items': {
+      type: 'collection',
+      items: {
+        sku: { type: 'string' },
+        stock: { type: 'number' },
+      },
     },
   },
 
   operators: {
     eq: {
-      allowedTypes: ['date', 'string', 'number', 'boolean'],
-      toMongo: (field, value, type) => ({
-        [field]: { $eq: toComparable(value, type) },
-      }),
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({ [field]: { $eq: toComparable(value as string, type) } }),
     },
-
     ne: {
-      allowedTypes: ['date', 'string', 'number', 'boolean'],
-      toMongo: (field, value, type) => ({
-        [field]: { $ne: toComparable(value, type) },
-      }),
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({ [field]: { $ne: toComparable(value as string, type) } }),
     },
-
     gt: {
-      allowedTypes: ['date', 'string', 'number', 'boolean'],
-      toMongo: (field, value, type) => ({
-        [field]: { $gt: toComparable(value, type) },
-      }),
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({ [field]: { $gt: toComparable(value as string, type) } }),
     },
-
     lt: {
-      allowedTypes: ['date', 'string', 'number', 'boolean'],
-      toMongo: (field, value, type) => ({
-        [field]: { $lt: toComparable(value, type) },
-      }),
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({ [field]: { $lt: toComparable(value as string, type) } }),
     },
-
     ge: {
-      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $gte: toComparable(value, type, 'start') },
+        [field]: { $gte: toComparable(value as string, type, 'start') },
       }),
     },
-
     le: {
-      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $lte: toComparable(value, type, 'end') },
+        [field]: { $lte: toComparable(value as string, type, 'end') },
       }),
     },
-
     in: {
-      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $in: value.map((v) => toComparable(v, type)) },
+        [field]: { $in: (value as string[]).map((v) => toComparable(v, type)) },
       }),
     },
   },
 };
 ```
 
-`toComparable` converts the raw string value based on the field's type: dates default to the exact UTC instant (`moment.utc(value).toDate()`), used by `eq`/`ne`/`gt`/`lt`/`in`, while `ge`/`le` pass `'start'`/`'end'` to widen to a day boundary (`startOf('day')` / `endOf('day')`); numbers become `Number(value)`, booleans become `value === 'true'`, and strings pass through unchanged. Every other operator receives a single string; `in` receives a `string[]` and converts each element the same way.
+`toComparable` converts the raw string value based on the field's type: dates default to the exact UTC instant, used by `eq`/`ne`/`gt`/`lt`/`in`, while `ge`/`le` pass `'start'`/`'end'` to widen to a day boundary (inclusive range over the whole day); numbers become `Number(value)`, booleans become `value === 'true'`, and strings pass through unchanged. This is a reference implementation, not a requirement — write whatever `toMongo` logic your fields need.
+
+The full working version of this config (used by the test suite) lives at [src/tests/fixtures/testConfig.ts](src/tests/fixtures/testConfig.ts).
 
 ---
 
@@ -435,28 +479,9 @@ This implementation follows a strict whitelist-only approach.
 
 Any field not listed in `config.fields` is rejected.
 
-```ts
-fields: {
-  'metadata.accountPeriodBeginDate': {
-    type: 'date',
-  },
-}
-```
-
 ## Operators must be explicitly configured
 
 Any operator not listed in `config.operators` is rejected.
-
-```ts
-operators: {
-  ge: {
-    allowedTypes: ['date', 'number'],
-    toMongo: (field, value) => ({
-      [field]: { $gte: moment(value).startOf('day').toDate() },
-    }),
-  },
-}
-```
 
 ## Type compatibility is enforced
 
@@ -468,53 +493,28 @@ Anything not explicitly configured is rejected.
 
 # Error Handling
 
-## Design Principle
+## Design principle
 
-The OData utility is domain-agnostic.
-
-It does NOT throw application-specific errors such as:
-
-- `FactError`
-- HTTP errors
-- Express errors
-
-Instead it throws:
-
-```ts
-ODataLiteError
-```
+The parser is domain-agnostic: it never throws application-specific errors (HTTP errors, framework errors, etc.). Every failure — lexer, parser, or validator — throws a single `ODataLiteError` with a stable `code` and `token`, so callers can catch one error type at the integration boundary and map it to whatever error convention their application uses.
 
 ## Error codes
 
-| Code | Thrown by | Meaning |
-|---|---|---|
-| `INVALID_CHARACTER` | Lexer | Input contains a character not valid in an OData filter |
-| `UNEXPECTED_TOKEN` | Parser | Token sequence does not match expected syntax |
-| `INVALID_FIELD` | Validator | Field is not in the whitelist |
-| `INVALID_OPERATOR` | Validator | Operator is not configured |
-| `OPERATOR_NOT_ALLOWED_FOR_FIELD_TYPE` | Validator | Operator does not support the field's type |
-| `INVALID_VALUE` | Validator | Value fails type-specific validation (e.g. date format) |
-| `FIELD_NOT_A_COLLECTION` | Validator | `any` used on a field not declared as `type: 'collection'` |
-| `INVALID_ALIAS_REFERENCE` | Validator | A predicate field inside `any(...)` doesn't reference the lambda alias |
+| Code                                  | Thrown by | Meaning                                                                |
+| ------------------------------------- | --------- | ---------------------------------------------------------------------- |
+| `INVALID_CHARACTER`                   | Lexer     | Input contains a character not valid in an OData filter                |
+| `UNEXPECTED_TOKEN`                    | Parser    | Token sequence does not match expected syntax                          |
+| `INVALID_FIELD`                       | Validator | Field is not in the whitelist                                          |
+| `INVALID_OPERATOR`                    | Validator | Operator is not configured                                             |
+| `OPERATOR_NOT_ALLOWED_FOR_FIELD_TYPE` | Validator | Operator does not support the field's type                             |
+| `INVALID_VALUE`                       | Validator | Value fails type-specific validation (e.g. date format)                |
+| `FIELD_NOT_A_COLLECTION`              | Validator | `any` used on a field not declared as `type: 'collection'`             |
+| `INVALID_ALIAS_REFERENCE`             | Validator | A predicate field inside `any(...)` doesn't reference the lambda alias |
 
-## Error Flow
-
-```txt
-ODataLiteError (library layer)
-   ↓ mapped at integration boundary
-FactError(82000) (application layer)
-   ↓
-HTTP response
-```
-
----
-
-# API Integration Example
+## Integration example
 
 ```ts
 try {
   const ast = odata.parse(filter);
-
   const mongoConditions = odata.toMongo(ast);
 
   queryOpts.conditions = {
@@ -523,7 +523,8 @@ try {
   };
 } catch (err: unknown) {
   if (err instanceof ODataLiteError) {
-    throw new FactError(82000);
+    // map to your application's own error type/HTTP response here
+    throw new BadRequestError(err.code, err.message);
   }
 
   throw err;
@@ -539,7 +540,7 @@ try {
 Add an entry to `config.fields` with a `type` matching one of: `date`, `string`, `number`, `boolean`.
 
 ```ts
-'metadata.accountPeriodEndDate': {
+'order.updatedAt': {
   type: 'date',
 }
 ```
@@ -549,11 +550,11 @@ Add an entry to `config.fields` with a `type` matching one of: `date`, `string`,
 Declare `type: 'collection'` with an `items` map whitelisting the sub-fields allowed inside the lambda predicate, keyed by their dotted path within each element.
 
 ```ts
-'metadata.tags': {
+'order.items': {
   type: 'collection',
   items: {
-    name: { type: 'string' },
-    priority: { type: 'number' },
+    sku: { type: 'string' },
+    stock: { type: 'number' },
   },
 }
 ```
@@ -566,7 +567,7 @@ Add an entry to `config.operators` with `allowedTypes` declaring which field typ
 gt: {
   allowedTypes: ['date', 'number'],
   toMongo: (field, value) => ({
-    [field]: { $gt: moment.utc(value).toDate() },
+    [field]: { $gt: value },
   }),
 }
 ```
@@ -575,37 +576,35 @@ gt: {
 
 # Testing
 
-The test suite uses Jest with ts-jest for TypeScript support.
+The test suite uses [Vitest](https://vitest.dev/), with [Chai](https://www.chaijs.com/) for assertions.
 
 ```bash
-npm test
+pnpm test
+pnpm test:coverage
 ```
 
-Tests are located in `src/tests/` and cover the lexer, parser, validator, and mongo builder individually.
+Tests are located in `src/tests/` and cover the lexer, parser, validator, and mongo builder individually, plus the public API in `index.test.ts`. Test-only fixtures (a generic example config) live in `src/tests/fixtures/`.
 
 ---
 
 # Future Extensions
 
-The architecture intentionally supports future evolution.
+Potential future capabilities, roughly in priority order:
 
-Potential future capabilities include:
+## Completing `$filter`
 
-## Parentheses support
+- `not` (logical negation)
+- Parentheses / grouping — `(A or B) and C`
+- String functions — `contains()`, `startswith()`, `endswith()`
+- `all()` lambda (sibling of `any()`)
 
-```txt
-(A and B) or C
-```
+## Additional query options
+
+- `$select`, `$orderby`, `$top`, `$skip`, `$count`
 
 ## Alternative query backends
 
-Because the AST is decoupled from MongoDB, future builders could support:
-
-- SQL
-- Prisma
-- Elasticsearch DSL
-
-without changing parser logic.
+Because the AST is decoupled from MongoDB, future builders could support SQL or Elasticsearch DSL without changing parser logic. `$expand` and `$apply` (aggregation) are explicitly out of scope for now — see project issues for discussion.
 
 ---
 
@@ -618,3 +617,9 @@ This implementation follows:
 - fail-fast validation
 - deterministic query generation
 - strict whitelist enforcement
+
+---
+
+# License
+
+MIT — see [LICENSE](LICENSE).

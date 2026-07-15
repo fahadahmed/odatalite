@@ -89,10 +89,7 @@ export class Lexer {
   private readWord(): Token {
     let value = '';
 
-    while (
-      this.i < this.input.length &&
-      /[a-zA-Z0-9_.]/.test(this.input[this.i])
-    ) {
+    while (this.i < this.input.length && /[a-zA-Z0-9_.]/.test(this.input[this.i])) {
       value += this.input[this.i];
       this.i++;
     }
@@ -140,10 +137,7 @@ export class Lexer {
   private readValue(): Token {
     let value = '';
 
-    while (
-      this.i < this.input.length &&
-      /[a-zA-Z0-9\-:T.Z]/.test(this.input[this.i])
-    ) {
+    while (this.i < this.input.length && /[a-zA-Z0-9\-:T.Z]/.test(this.input[this.i])) {
       value += this.input[this.i];
       this.i++;
     }
