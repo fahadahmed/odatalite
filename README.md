@@ -74,6 +74,12 @@ try {
 
 See [Configuration](#configuration) below for a fuller example, including date handling and collection (`any`) fields.
 
+For runnable, end-to-end versions of this, see [examples/](examples/):
+
+- [examples/config.ts](examples/config.ts) — the reference config used by the examples below
+- [examples/basic-usage.ts](examples/basic-usage.ts) — parsing filters (including `any()`) and handling `ODataLiteError` (`pnpm example:basic`)
+- [examples/api-integration.ts](examples/api-integration.ts) — wiring a filter query param into an API route handler (`pnpm example:api`)
+
 ---
 
 # What is OData?
