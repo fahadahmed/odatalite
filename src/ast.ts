@@ -11,7 +11,7 @@ export interface ComparisonNode {
   type: 'comparison';
   field: string;
   operator: string;
-  value: string;
+  value: string | string[];
 }
 
 export interface AnyNode {

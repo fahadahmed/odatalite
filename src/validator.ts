@@ -79,7 +79,11 @@ export class Validator {
     }
 
     if (fieldConfig.type === 'date') {
-      this.validateDate(node.value);
+      if (Array.isArray(node.value)) {
+        node.value.forEach((value) => this.validateDate(value));
+      } else {
+        this.validateDate(node.value);
+      }
     }
   }
 

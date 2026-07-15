@@ -62,6 +62,16 @@ export class Parser {
     }
 
     const operator = this.consume('operator').value;
+
+    if (operator === 'in') {
+      return {
+        type: 'comparison',
+        field,
+        operator,
+        value: this.parseValueList(),
+      };
+    }
+
     const value = this.consume('value').value;
 
     if (!field || !operator || !value) {
@@ -77,6 +87,19 @@ export class Parser {
       operator,
       value,
     };
+  }
+
+  private parseValueList(): string[] {
+    this.consume('lparen');
+    const values = [this.consume('value').value];
+
+    while (this.match('comma')) {
+      values.push(this.consume('value').value);
+    }
+
+    this.consume('rparen');
+
+    return values;
   }
 
   private parseAny(field: string): ASTNode {

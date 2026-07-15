@@ -95,6 +95,50 @@ describe('Parser', () => {
     expect((ast as { predicate: { type: string } }).predicate.type).to.equal('logical');
   });
 
+  it('should parse an in comparison expression with a value list', () => {
+    const tokens = new Lexer("metadata.status in ('active','pending')").tokenize();
+
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+
+    expect(ast).to.deep.equal({
+      type: 'comparison',
+      field: 'metadata.status',
+      operator: 'in',
+      value: ['active', 'pending'],
+    });
+  });
+
+  it('should parse an in comparison expression with a single value', () => {
+    const tokens = new Lexer("metadata.status in ('active')").tokenize();
+
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+
+    expect(ast).to.deep.equal({
+      type: 'comparison',
+      field: 'metadata.status',
+      operator: 'in',
+      value: ['active'],
+    });
+  });
+
+  it('should parse an in comparison expression with date values', () => {
+    const tokens = new Lexer(
+      'metadata.accountPeriodBeginDate in (2025-07-01,2025-08-01)'
+    ).tokenize();
+
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+
+    expect(ast).to.deep.equal({
+      type: 'comparison',
+      field: 'metadata.accountPeriodBeginDate',
+      operator: 'in',
+      value: ['2025-07-01', '2025-08-01'],
+    });
+  });
+
   it('should throw ODataLiteError for an empty quoted value', () => {
     const tokens = new Lexer("metadata.status eq ''").tokenize();
     const parser = new Parser(tokens);

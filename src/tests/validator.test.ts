@@ -99,7 +99,7 @@ describe.only('Validator', () => {
         operators: {
           ge: {
             allowedTypes: ['date', 'number'],
-            toMongo: (field: string, value: string) => ({ [field]: { $gte: value } }),
+            toMongo: (field: string, value: string | string[]) => ({ [field]: { $gte: value } }),
           },
         },
       };
@@ -138,6 +138,54 @@ describe.only('Validator', () => {
           expect(err.code).to.equal('INVALID_VALUE');
           expect(err.token).to.equal('07-01-2025');
           expect(err.message).to.equal("Invalid date value '07-01-2025'");
+        });
+    });
+  });
+
+  describe('in validation', () => {
+    const stringFieldConfig: ODataLiteConfig = {
+      fields: {
+        'metadata.status': { type: 'string' },
+      },
+      operators: odataConfig.operators,
+    };
+
+    it('should validate a valid in comparison', () => {
+      const ast: ASTNode = {
+        type: 'comparison',
+        field: 'metadata.status',
+        operator: 'in',
+        value: ['active', 'pending'],
+      };
+
+      expect(() => new Validator(stringFieldConfig).validate(ast)).to.not.throw();
+    });
+
+    it('should validate each date value in an in comparison', () => {
+      const ast: ASTNode = {
+        type: 'comparison',
+        field: 'metadata.accountPeriodBeginDate',
+        operator: 'in',
+        value: ['2025-07-01', '2026-06-30'],
+      };
+
+      expect(() => validator.validate(ast)).to.not.throw();
+    });
+
+    it('should reject an in comparison with an invalid date value', async () => {
+      const ast: ASTNode = {
+        type: 'comparison',
+        field: 'metadata.accountPeriodBeginDate',
+        operator: 'in',
+        value: ['2025-07-01', '07-01-2025'],
+      };
+
+      await expect((async () => validator.validate(ast))())
+        .to.be.rejected
+        .then((err: ODataLiteError) => {
+          expect(err).to.be.instanceOf(ODataLiteError);
+          expect(err.code).to.equal('INVALID_VALUE');
+          expect(err.token).to.equal('07-01-2025');
         });
     });
   });

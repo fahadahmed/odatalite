@@ -47,6 +47,7 @@ OData operators include:
 - `ge` → greater than or equal
 - `lt` → less than
 - `le` → less than or equal
+- `in` → value is one of a list
 - logical operators such as `and`, `or`, `not`
 
 References:
@@ -118,6 +119,15 @@ metadata.status eq 'active'
 metadata.isActive eq true
 ```
 
+## Value lists (`in`)
+
+`in` checks a field against a parenthesized, comma-separated list of values. Each value follows the same literal rules as a single comparison (quoted strings, bare dates/numbers/booleans):
+
+```txt
+metadata.status in ('active','pending')
+metadata.accountPeriodBeginDate in (2025-07-01,2025-08-01)
+```
+
 ## Supported operators
 
 | Operator | Meaning | Allowed field types |
@@ -128,6 +138,7 @@ metadata.isActive eq true
 | `lt` | less than | `date`, `string`, `number`, `boolean` |
 | `ge` | greater than or equal | `date`, `string`, `number`, `boolean` |
 | `le` | less than or equal | `date`, `string`, `number`, `boolean` |
+| `in` | value is one of a list | `date`, `string`, `number`, `boolean` |
 
 ## `any` lambda over collections
 
@@ -208,6 +219,17 @@ For chained expressions:
 }
 ```
 
+For `in`, `value` is an array instead of a single string:
+
+```ts
+{
+  type: 'comparison',
+  field: 'metadata.status',
+  operator: 'in',
+  value: ['active', 'pending']
+}
+```
+
 ---
 
 ## What is an AST?
@@ -258,7 +280,7 @@ operators: {
 
 ### Value validation
 
-For `date` fields, values are validated against a strict `YYYY-MM-DD` format using a Zod schema. Invalid values throw `INVALID_VALUE`.
+For `date` fields, values are validated against a strict `YYYY-MM-DD` format using a Zod schema. Invalid values throw `INVALID_VALUE`. For `in`, every value in the list is validated the same way — a single invalid date anywhere in the list rejects the whole filter.
 
 ### `any` validation
 
@@ -280,6 +302,17 @@ For `date` fields, `ge`/`le` widen the value to a day boundary (so they behave a
 | `ne` | `$ne` | `moment.utc(value).toDate()` — exact instant |
 | `gt` | `$gt` | `moment.utc(value).toDate()` — exact instant |
 | `lt` | `$lt` | `moment.utc(value).toDate()` — exact instant |
+| `in` | `$in` | `moment.utc(value).toDate()` per element — exact instant |
+
+`in` applies the same per-type conversion as `eq` to every element of the list, then wraps the result in `$in`:
+
+```ts
+{
+  'metadata.status': {
+    $in: ['active', 'pending']
+  }
+}
+```
 
 Example output for a single comparison:
 
@@ -379,11 +412,18 @@ export const odataConfig = {
         [field]: { $lte: toComparable(value, type, 'end') },
       }),
     },
+
+    in: {
+      allowedTypes: ['date', 'string', 'number', 'boolean'],
+      toMongo: (field, value, type) => ({
+        [field]: { $in: value.map((v) => toComparable(v, type)) },
+      }),
+    },
   },
 };
 ```
 
-`toComparable` converts the raw string value based on the field's type: dates default to the exact UTC instant (`moment.utc(value).toDate()`), used by `eq`/`ne`/`gt`/`lt`, while `ge`/`le` pass `'start'`/`'end'` to widen to a day boundary (`startOf('day')` / `endOf('day')`); numbers become `Number(value)`, booleans become `value === 'true'`, and strings pass through unchanged.
+`toComparable` converts the raw string value based on the field's type: dates default to the exact UTC instant (`moment.utc(value).toDate()`), used by `eq`/`ne`/`gt`/`lt`/`in`, while `ge`/`le` pass `'start'`/`'end'` to widen to a day boundary (`startOf('day')` / `endOf('day')`); numbers become `Number(value)`, booleans become `value === 'true'`, and strings pass through unchanged. Every other operator receives a single string; `in` receives a `string[]` and converts each element the same way.
 
 ---
 
@@ -556,10 +596,6 @@ Potential future capabilities include:
 ```txt
 (A and B) or C
 ```
-
-## Additional operators
-
-- `in`
 
 ## Alternative query backends
 

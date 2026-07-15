@@ -10,6 +10,7 @@ export type Token =
   | { type: 'lparen' }
   | { type: 'rparen' }
   | { type: 'colon' }
+  | { type: 'comma' }
   | { type: 'eof' };
 
 export class Lexer {
@@ -67,6 +68,12 @@ export class Lexer {
         continue;
       }
 
+      if (c === ',') {
+        this.i++;
+        tokens.push({ type: 'comma' });
+        continue;
+      }
+
       throw new ODataLiteError({
         code: 'INVALID_CHARACTER',
         message: `Unexpected character '${c}' encountered while tokenising filter`,
@@ -108,7 +115,8 @@ export class Lexer {
       value === 'gt' ||
       value === 'lt' ||
       value === 'eq' ||
-      value === 'ne'
+      value === 'ne' ||
+      value === 'in'
     ) {
       return {
         type: 'operator',

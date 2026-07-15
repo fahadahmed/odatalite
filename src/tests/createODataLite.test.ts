@@ -79,6 +79,56 @@ describe('createODataLite', () => {
     });
   });
 
+  it('should parse and convert an in comparison to a mongo query', () => {
+    const stringConfig: ODataLiteConfig = {
+      fields: {
+        'metadata.status': { type: 'string' },
+      },
+      operators: odataConfig.operators,
+    };
+    const stringOdata = createODataLite(stringConfig);
+
+    const ast = stringOdata.parse("metadata.status in ('active','pending')");
+
+    expect(ast).to.deep.equal({
+      type: 'comparison',
+      field: 'metadata.status',
+      operator: 'in',
+      value: ['active', 'pending'],
+    });
+
+    const mongoQuery = stringOdata.toMongo(ast);
+
+    expect(mongoQuery).to.deep.equal({
+      'metadata.status': { $in: ['active', 'pending'] },
+    });
+  });
+
+  it('should parse and convert an in comparison with dates to a mongo query', () => {
+    const ast = odata.parse('metadata.accountPeriodBeginDate in (2025-07-01,2025-08-01)');
+
+    expect(ast).to.deep.equal({
+      type: 'comparison',
+      field: 'metadata.accountPeriodBeginDate',
+      operator: 'in',
+      value: ['2025-07-01', '2025-08-01'],
+    });
+
+    const mongoQuery = odata.toMongo(ast);
+
+    expect(mongoQuery).to.deep.equal({
+      'metadata.accountPeriodBeginDate': {
+        $in: [moment.utc('2025-07-01').toDate(), moment.utc('2025-08-01').toDate()],
+      },
+    });
+  });
+
+  it('should throw ODataLiteError when an in comparison contains an invalid date', () => {
+    expect(() =>
+      odata.parse('metadata.accountPeriodBeginDate in (2025-07-01,07-01-2025)')
+    ).to.throw(ODataLiteError);
+  });
+
   it('should throw ODataLiteError when the field is not whitelisted', () => {
     expect(() => odata.parse('invalid.field ge 2025-07-01')).to.throw(
       ODataLiteError

@@ -96,6 +96,36 @@ describe('Lexer', () => {
     ]);
   });
 
+  it('should tokenize an in expression with a value list', () => {
+    const lexer = new Lexer("metadata.status in ('active','pending')");
+
+    expect(lexer.tokenize()).to.deep.equal([
+      { type: 'identifier', value: 'metadata.status' },
+      { type: 'operator', value: 'in' },
+      { type: 'lparen' },
+      { type: 'value', value: 'active' },
+      { type: 'comma' },
+      { type: 'value', value: 'pending' },
+      { type: 'rparen' },
+      { type: 'eof' },
+    ]);
+  });
+
+  it('should tokenize an in expression with unquoted date values', () => {
+    const lexer = new Lexer('metadata.accountPeriodBeginDate in (2025-07-01,2025-08-01)');
+
+    expect(lexer.tokenize()).to.deep.equal([
+      { type: 'identifier', value: 'metadata.accountPeriodBeginDate' },
+      { type: 'operator', value: 'in' },
+      { type: 'lparen' },
+      { type: 'value', value: '2025-07-01' },
+      { type: 'comma' },
+      { type: 'value', value: '2025-08-01' },
+      { type: 'rparen' },
+      { type: 'eof' },
+    ]);
+  });
+
   it('should throw ODataLiteError for an unterminated string literal', () => {
     const lexer = new Lexer("metadata.status eq 'active");
     try {

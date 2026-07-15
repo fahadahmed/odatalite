@@ -55,42 +55,49 @@ export const odataConfig = {
     eq: {
       allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $eq: toComparable(value, type) },
+        [field]: { $eq: toComparable(value as string, type) },
       }),
     },
 
     ne: {
       allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $ne: toComparable(value, type) },
+        [field]: { $ne: toComparable(value as string, type) },
       }),
     },
 
     gt: {
       allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $gt: toComparable(value, type) },
+        [field]: { $gt: toComparable(value as string, type) },
       }),
     },
 
     lt: {
       allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $lt: toComparable(value, type) },
+        [field]: { $lt: toComparable(value as string, type) },
       }),
     },
 
     ge: {
       allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $gte: toComparable(value, type, 'start') },
+        [field]: { $gte: toComparable(value as string, type, 'start') },
       }),
     },
 
     le: {
       allowedTypes: ALL_TYPES,
       toMongo: (field, value, type) => ({
-        [field]: { $lte: toComparable(value, type, 'end') },
+        [field]: { $lte: toComparable(value as string, type, 'end') },
+      }),
+    },
+
+    in: {
+      allowedTypes: ALL_TYPES,
+      toMongo: (field, value, type) => ({
+        [field]: { $in: (value as string[]).map((v) => toComparable(v, type)) },
       }),
     },
   },

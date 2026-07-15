@@ -56,6 +56,21 @@ describe('MongoBuilder', () => {
     });
   });
 
+  it('should build mongo query for an in comparison', () => {
+    const ast: ASTNode = {
+      type: 'comparison',
+      field: 'metadata.status',
+      operator: 'in',
+      value: ['active', 'pending'],
+    };
+
+    const result = builder.build(ast);
+
+    expect(result).to.deep.equal({
+      'metadata.status': { $in: ['active', 'pending'] },
+    });
+  });
+
   it('should build mongo query for a logical or expression', () => {
     const ast: ASTNode = {
       type: 'logical',
@@ -195,6 +210,32 @@ describe('MongoBuilder', () => {
       });
 
       expect(ne).to.deep.equal({ 'metadata.isActive': { $ne: false } });
+    });
+
+    it('should build in for a number field as a numeric $in list', () => {
+      const result = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.amount',
+        operator: 'in',
+        value: ['100', '200'],
+      });
+
+      expect(result).to.deep.equal({ 'metadata.amount': { $in: [100, 200] } });
+    });
+
+    it('should build in for a date field as a $in list of exact UTC instants', () => {
+      const result = typedBuilder.build({
+        type: 'comparison',
+        field: 'metadata.accountPeriodBeginDate',
+        operator: 'in',
+        value: ['2025-07-01', '2025-08-01'],
+      });
+
+      expect(result).to.deep.equal({
+        'metadata.accountPeriodBeginDate': {
+          $in: [moment.utc('2025-07-01').toDate(), moment.utc('2025-08-01').toDate()],
+        },
+      });
     });
 
     it('should build ge/le for a string field as lexicographic comparisons', () => {

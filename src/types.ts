@@ -9,7 +9,7 @@ export interface OperatorDefinition {
   allowedTypes: string[];
   toMongo: (
     field: string,
-    value: string,
+    value: string | string[],
     type: FieldDefinition['type'],
   ) => Record<string, unknown>;
 }
